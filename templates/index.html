@@ -179,7 +179,15 @@
       <p>List the exercises reccomended to you by your physiotherapist:</p>
       <textarea id="exercisesInput" placeholder="e.g., Hamstring Stretch, Hip Extension on Side, Side Stepping."></textarea>
       <br />
-      <button id="askButton">Get Exercise Steps</button>
+      <div class="button-row">
+        <button id="askButton">Get Exercise Steps</button>
+
+        <div class="file-upload-inline-container">
+            <input type="file" name="pdf_file" id="inlinePdfFileInput" accept=".pdf">
+            <label for="inlinePdfFileInput" class="custom-file-upload">Upload PDF</label>
+            <span id="inlineFileNameDisplay" class="file-name">No file chosen</span>
+        </div>
+      </div>
 
       <div id="recommendationResult" style="margin-top: 1rem;">
         <p><strong>Exercise:</strong> <span id="exerciseOutput">N/A</span></p>
@@ -578,7 +586,49 @@
           state.processingFrames = false;
         }
       }
+      /********************************************
+       * UPLOAD FUNCTIONALITY (INLINE)
+       *******************************************/
+      document.getElementById('inlinePdfFileInput').addEventListener('change', function() {
+          const fileNameDisplay = document.getElementById('inlineFileNameDisplay');
+          if (this.files.length > 0) {
+              fileNameDisplay.textContent = this.files[0].name;
+              // Automatically upload when file is selected
+              uploadPdfFile(this.files[0]);
+          } else {
+              fileNameDisplay.textContent = 'No file chosen';
+          }
+      });
 
+      async function uploadPdfFile(file) {
+          const uploadStatus = document.getElementById('inlineUploadStatus');
+          uploadStatus.textContent = 'Uploading...';
+          uploadStatus.style.color = '#007bff';
+
+          const formData = new FormData();
+          formData.append('pdf_file', file);
+
+          try {
+              const response = await fetch('/upload_pdf', {
+                  method: 'POST',
+                  body: formData
+              });
+
+              const data = await response.json();
+
+              if (response.ok) {
+                  uploadStatus.textContent = data.message || 'File uploaded successfully!';
+                  uploadStatus.style.color = '#28a745'; // Green for success
+              } else {
+                  uploadStatus.textContent = data.error || 'Error uploading file.';
+                  uploadStatus.style.color = '#dc3545'; // Red for error
+              }
+          } catch (error) {
+              console.error('Upload error:', error);
+              uploadStatus.textContent = 'Network error or server unreachable.';
+              uploadStatus.style.color = '#dc3545'; // Red for error
+          }
+      }
       /********************************************
        * UTILS
        *******************************************/
