@@ -1,0 +1,565 @@
+# app.py
+from flask import Flask, request, jsonify, render_template, Response
+import os
+import io
+from PIL import Image
+import base64
+import cv2
+import time
+import numpy as np
+import re
+import requests
+'''
+    Flask: web framework in Python
+        request: access data sent in an HTTP request
+        jsonify: Python objects -> JSON (send to front end)
+        r_t: renders HTML templates
+        Response: customizes what HTTP response from Flask server is sent to the client
+    os: access to OS functions
+    io: lets you treat in-memory data as file-like objects
+    Pillow: lets you open/manipulate/save image files
+    base64: encode/decode data in Base64 (turn binary data into plain text)
+    OpenCV: library for computer vision (read/write, apply filters, use webcam, detect objs)
+    time: use time-based functions (sleep (pause), time (get current time))
+    np: NumPy library for numerical computing in Python
+'''
+
+# Load environment variables from .env file (if using dotenv)
+from dotenv import load_dotenv
+load_dotenv() # Call this at the very beginning
+
+print('DEBUG: GOOGLE_API_KEY', os.getenv('GOOGLE_API_KEY'))
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+
+# Google Generative AI imports
+import google.generativeai as genai
+'''
+    prepare the app to use Google's GenAi models, and load environment variables from .env
+    allows you to securely manage sensitive data like API keys without hardcoding 
+'''
+
+# LangChain imports (for RAG)
+from langchain_chroma import Chroma
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.chains import RetrievalQA
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_google_genai import GoogleGenerativeAI # For text-only initial recommendations
+from langchain_google_genai import ChatGoogleGenerativeAI # Often better for multimodal and conversational
+# For processing frames with Vision model
+from langchain_core.messages import HumanMessage
+'''
+    this block is needed to build a RAG system with Gemini inside a Flask app
+        LangChain for RAG (Retrieval-Augmented Generation): connect LLMs to external data (PDFs, dbs, docs) + querying that data
+    Chroma: vector store; save and search docs based on semantic embedding
+    PyPDFLoader: load PDF file and split it into pages or chunks as docs so LC can process
+    RecCharTSp: splits long text into smaller overlapping chunks (recursively splitting)
+    RetrievalQA: user question -> search relevant docs -> LLM answers using those docs
+    GoogGenAI: instantiates text-only Google LLM 
+    ChatGoogGenAI: chat-based Google LLM 
+    HumanMessage: used when interacting with chat model (how you send a message from user into the chat)
+        AIMessage is used for the model's response
+        we are capturing video frames (and encoding them) -> sending them to a Vision model (Gemini)
+        instead of the human chatting, it has a VIDEO response
+'''
+
+app = Flask(__name__) # create Flask app instance, which will be used later to define routes
+'''
+    What is Flask? a Python web framework that lets you turn Python code into a web app
+        API (Application Programming Interface): a way for different softwar programs to talk to each other
+            the rules, formats, and endpoints that different programs use
+            API client: an individual software program
+            our Flask app's API endpoint: a special URL route
+        Recap of HTTP methods: GET (request), POST (send), PUT (update), DELETE (remove)
+    What does Flask do? runs a web server, maps URLs to functions, sends back responses
+        overall: builds routes, handle requests, and return responses
+    What is a Flask app instance? a Flask application object (called app)
+        acts as the central registry for your routes
+        keeps track of configuration settings + starts the server when you run it
+'''
+
+# --- Configure Google Gemini API Key ---
+if os.getenv("GOOGLE_API_KEY") is None:
+    print("Warning: GOOGLE_API_KEY environment variable not set. Please set it. Exiting.")
+    exit() # Exit if API key is not set, as it's critical.
+
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+'''
+    A Google Gemini API key: a secret token that Google gives you to access their API services
+    must be configured in order for our program to communicate with Google's AI models     
+'''
+
+# --- Global Variables for Exercise State ---
+current_exercise_steps = []
+current_exercise_index = 0
+vlm_model = None # To be initialized with gemini-pro-vision
+'''
+    initialize variables that will be used for the step-by-step instructions feature
+'''
+
+# --- RAG Setup (Load PDFs and Create Vector Store) ---
+vectorstore = None # store vector database (from contents of PDFs) + search for info
+llm = None # store LLM (text-only Gemini model)
+qa_chain = None # RAG chain: combines vectorstore + LLM (q-a pipeline)
+
+def setup_llm_and_rag():
+    global vectorstore, llm, qa_chain, vlm_model
+
+    # 1. Load your PDF files
+    pdf_folder = r"./data"
+    print("Using pdf_folder path:", pdf_folder)
+    pdf_paths = [os.path.join(pdf_folder, f) for f in os.listdir(pdf_folder) if f.endswith(".pdf")]
+    
+    documents = []
+    for pdf_path in pdf_paths:
+        if os.path.exists(pdf_path):
+            try:
+                loader = PyPDFLoader(pdf_path)
+                documents.extend(loader.load())
+            except Exception as e:
+                print(f"Failed to load {pdf_path}: {e}")
+        else:
+            print(f"Warning: PDF file not found at {pdf_path}")
+    ''' 
+        loads booklet as a list of pages 
+        each page is a separate Document obj
+    '''
+
+    # 2. Split documents into chunks
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    texts = text_splitter.split_documents(documents)
+    ''' 
+        (~1000 characters), essential for RAG precision 
+    '''
+
+    # 3. Create embeddings using GoogleGenerativeAIEmbeddings
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    '''
+        text chunks -> high-dimensional numerical vectors (needed for semantic search)
+    '''
+
+    # 4. Create a vector store from the embeddings
+    vectorstore = Chroma.from_documents(texts, embeddings)
+    print("Vector store created successfully.") # Chroma database = fast, relevant look-up
+
+    # 5. Initialize Google Gemini LLM (for text-based recommendation)
+    try:
+        # Use a text-only model for initial recommendation
+        llm = GoogleGenerativeAI(model="gemini-2.0-flash") # Updated to flash for potentially faster response
+        print("Google Gemini LLM for text initialized successfully.")
+    except Exception as e:
+        print(f"Error initializing text LLM: {e}")
+        llm = None
+    '''
+        text-only Gemini model
+        generate answers based on booklet content + user questions
+    '''
+
+    # 6. Initialize Google Gemini VLM (for vision-based analysis)
+    try:
+        vlm_model = ChatGoogleGenerativeAI(model="gemini-2.0-flash") # Use a model with vision for frame analysis
+        print("Google Gemini VLM initialized successfully.")
+    except Exception as e:
+        print(f"Error initializing VLM: {e}")
+        vlm_model = None
+    '''
+        handles image inputs AND text 
+    '''
+
+    # 7. Create the RAG chain
+    if llm and vectorstore:
+        qa_chain = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=vectorstore.as_retriever()
+        )
+        print("RAG QA chain created.")
+    else:
+        print("Could not create RAG QA chain. Check LLM and vectorstore setup.")
+    '''
+        combines the vector store (find relevant text) + LLM (generate answers)
+        QUESTION: will we be using RAG for our VLM as well?
+    '''
+
+# Run RAG setup on server start
+with app.app_context():
+    setup_llm_and_rag() 
+'''
+    initialize LangChain RAG pipeline:
+    loads pDF, embeds docs, initialize LLMs, set up qa_chain for user queries
+'''
+
+# display main webpage (html file from templates folder)
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+# main function: POST reqs, take in user prompt, queries RAG, parses LLM output
+'''
+    Frontend -> POST /ask_llm -> Flask backend -> build prompt -> qa_chain (RAG)
+    -> LLM -> parse response (steps + supervision) -> return JSON -> Frontend
+'''
+@app.route('/ask_llm', methods=['POST'])
+def ask_llm():
+    global current_exercise_steps, current_exercise_index # Use globals
+
+    # 1. get symptoms input -> change to get exercises/type of prosthetic
+    ''' 
+        when a client sends a POST request to the Flask route (/ask_llm) the data 
+        must be in JSON format and must contain a key called "symptoms" 
+    '''
+    print(request.json)
+    print("*******************")
+    user_details = request.json.get('prosthetic')
+    if not user_details:
+        return jsonify({"error": "No details provided"}), 400
+    user_exercises = request.json.get('exercises')
+    exercise_purpose = ['Strength', 'Mobility', 'Balance', 'Agility'] # needed?
+    if not user_exercises:
+        return jsonify({"error": "No exercises provided"}), 400
+
+    if not qa_chain: # ensure qa_chain is set up
+        return jsonify({"error": "LLM or RAG not initialized. Please check server logs and API key."}), 500
+
+    # 2. build the prompt: instructs the LLM what to do 
+    ''' outline:
+        - retrieve relevant exercises from doc based on symptoms
+        - provide clear steps
+        - indicate if supervision is required 
+        - fall back to general knowledge if PDF has no matches 
+
+        change to: 
+        - retrieve relevant exercises from doc if user has provided names of exercises 
+        - get exercises from user uploaded PDF if uploaded 
+        - explain the exercise + include common errors
+        - state  how to position selves in front of camera
+        - add feedback option (provide alternatives if this exercise is too difficult)
+    '''
+    try:
+        prompt = ( # should we also add when they were released from physio??
+            # for testing purposes add a line that states which documents were used
+            f"You are a virtual rehabilitation assistant "
+            f"to help guide users with lower limb prosthetics through their rehabilitation exercises. "
+            f"Given the following exercises: {user_exercises}, provide a step-by-step description of the exercises "
+            f"based on the user's type of prosthetic: {user_details}. Use the provided documents to find exercises descriptions. "
+            f"The description must be tailored towards the user's type of prosthetic."
+            f"If you could not find the exercise provided specific to the user's prosthetic, suggest an alternative based on the documents provided. "
+            f"For each exercise, also state the types of prosthetic limb that this exercise is used for. "
+            f"For each exercise, also state the purpose of the exercise. Choose the best option from {exercise_purpose}"
+            f"For each recommended exercise, also state commmon mistakes that individuals make "
+            f"when performing the exercises, so the user is aware. "
+            f"IMPORTANT: If you could not find any related exercise from documents provided, please state that no alternative was found. "
+            f"Additionally, provide the exercise steps clearly. "
+            f"Format your response as follows:\n\n"
+            f"Exercise: [Name of Exercise]\n"
+            f"Prosthetic limb type(s): [Type of Prosthetic Limb(s) that Utilize the Exercise]"
+            f"Purpose: [The purpose of the exercise]"
+            f"Common mistakes: [Common Mistakes the User Should be Aware of]"
+            f"Exercise 1:"
+            f"Steps:\n"
+            f"1. [Step 1 description]\n"
+            f"2. [Step 2 description]\n"
+            f"Exercise 2:"
+            f"...\n\n"
+            f"Recommended Exercises:"
+        )
+        print(prompt)
+        
+        # 3. querry LLM chain via qa_chain (run the RAG process)
+        '''
+            RAG process: search the vectorstore + pass results to LLM
+            returns a dictionary with "result" as key based on PDFs
+        '''
+        response = qa_chain.invoke({"query": prompt})
+        exercise_recommendation_full_text = response.get("result", "Could not find a suitable exercise.")
+
+        # extract using regex patterns
+        exercise = re.search(r"Exercise:\s*(.*?)\s*Prosthetic", exercise_recommendation_full_text)
+        prosthetic = re.search(r"Prosthetic limb type\(s\):\s*(.*?)\s*Purpose", exercise_recommendation_full_text)
+        purpose = re.search(r"Purpose:\s*(.*?)\s*Common mistakes", exercise_recommendation_full_text)
+        mistakes = re.search(r"Common mistakes:\s*(.*?)\s*Exercise", exercise_recommendation_full_text)
+        print(exercise, prosthetic, purpose, mistakes)
+        
+        # 4. parse response to get supervision and steps 
+        ''' this parsing is highly dependent on the LLM's output format.
+            you might need to fine-tune the prompt or use more sophisticated parsing.'''
+        extracted_steps = []
+
+        response_lines = exercise_recommendation_full_text.split('\n') # split into lines
+        in_steps_section = False
+        count = 1
+        
+        for line in response_lines: # look for key words (supervision, steps, etc.)
+            if "steps:" in line.lower():
+                in_steps_section = True
+                extracted_steps.append(f"Exercise {count}:\n")
+                count += 1
+            elif in_steps_section and line.strip() and (line.strip().startswith(('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.')) or line.strip().startswith(('- ' , '* '))):
+                extracted_steps.append(line.strip())
+            elif in_steps_section and not line.strip(): # End of steps if empty line
+                 in_steps_section = False
+        
+         # Fallback if steps aren't parsed well
+        if not extracted_steps:
+            extracted_steps = ["Could not parse specific steps. Please refer to the general description."]
+            ''' as a fallback, you could try to summarize the 'Description' part if it exists
+                for simplicity, we'll just put a generic message if structured steps aren't found. '''
+
+
+        # 5. reset exercise state for new recommendation (save to global state)
+           # -> this allows the rest of the app to know what was just recommended
+        current_exercise_steps = extracted_steps
+        current_exercise_index = 0
+
+        # return JSON (exercises, steps, etc) to Frontend (to be displayed on screen)
+        return jsonify({
+            "exercise": exercise.group(1) if exercise else "",
+            "prosthetic": prosthetic.group(1) if prosthetic else "",
+            "purpose": purpose.group(1) if purpose else "",
+            "mistake": mistakes.group(1) if mistakes else "",
+            "steps": current_exercise_steps
+        })
+    
+    # fail safe for any error (eg: LLM API failure)
+    except Exception as e:
+        print(f"Error during LLM call: {e}")
+        return jsonify({"error": f"Failed to get LLM response: {str(e)}. Please check API key and model availability."}), 500
+
+# --- New Endpoint for VLM Processing ---
+@app.route('/process_frame', methods=['POST']) # endpoint design to analyze user's pose (base64-encoded image sent by front end)
+
+# main function: accepts image + current step -> determines if user correct 
+#                 -> provides feedback -> advance to next step
+def process_frame():
+    global current_exercise_steps, current_exercise_index, vlm_model
+
+    # 1. check for model and exercise steps
+    if not vlm_model:
+        return jsonify({"error": "VLM not initialized. Cannot process frame."}), 500
+    if not current_exercise_steps:
+        return jsonify({"error": "No exercise steps available. Please get an exercise recommendation first."}), 400
+
+    # 2. get image (grabs image sent from frontend, remove header, decode string into raw image bytes)
+    image_data_b64 = request.json.get('image')
+    if not image_data_b64:
+        return jsonify({"error": "No image data provided."}), 400
+
+    # The image data comes as 'data:image/jpeg;base64,...', so split off the header
+    if ',' in image_data_b64:
+        header, image_data_b64 = image_data_b64.split(',', 1)
+
+    # 3. get current exercise step based on image + provide feedback
+    try:
+        image_bytes = base64.b64decode(image_data_b64)
+        # In a real scenario, you might save this image temporarily or process it
+        # For direct VLM use, we just need the bytes.
+
+        # 3a. 
+        current_step_text = current_exercise_steps[current_exercise_index]
+        print('Curentttt', current_step_text, ("Exercise " in current_step_text))
+        # input('')
+        # Construct the VLM prompt
+        # IMPORTANT: This prompt needs to be very specific for good results.
+        # You would integrate pose estimation here to get structured data for the VLM.
+        # For a basic example, we'll ask it to describe the pose and compare.
+        '''
+            breakdown: 
+            - mix the image + text -> multimodal prompt 
+            - asks model if the user image pose is correct for this step 
+
+            change to/add: 
+        '''
+        prompt_parts = [
+            {"mime_type": "image/jpeg", "data": image_bytes},
+            f"You are an exercise coach. Analyze the person's pose in this image. "
+            f"Are they correctly performing the following exercise step? "
+            f"Current Step: \"{current_step_text}\".\n"
+            f"Provide feedback: Is the step done correctly? If not, what adjustments are needed? "
+            f"Conclude with 'Status: [Completed/Not Completed]'."
+        ]
+
+        # 3b. handle response to get model's answer 
+        # Use LangChain's ChatModel for multimodal
+        response = vlm_model.invoke(
+            [HumanMessage(content=prompt_parts)] # send image + instructions to Gemini Vision (VLM model)
+        )
+
+        feedback = response.content # Access the content of the AI's message
+        # Basic check for completion status (refine this based on actual VLM output)
+        if ("status: completed" in feedback.lower()) or ("Exercise " in current_step_text):
+            status = "Completed"
+            current_exercise_index += 1 # Move to next step
+            if current_exercise_index >= len(current_exercise_steps):
+                status = "All Steps Completed!"
+                current_exercise_index = len(current_exercise_steps) - 1 # Stay on last step
+        else:
+            status = "Not Completed"
+
+        next_step_text = "Exercise Finished!" if current_exercise_index >= len(current_exercise_steps) else current_exercise_steps[current_exercise_index]
+
+        # 4. send response to Frontend 
+        return jsonify({
+            "feedback": feedback,
+            "current_step": current_step_text,
+            "next_step": next_step_text,
+            "status": status,
+            "is_last_step": (current_exercise_index >= len(current_exercise_steps))
+        })
+
+    # 5. fail safe
+    except Exception as e:
+        print(f"Error processing frame: {e}")
+        return jsonify({"error": f"Failed to process frame: {str(e)}"}), 500
+
+# --- Webcam Streaming (for direct display, not VLM processing) ---
+# This part is separate from the VLM processing.
+camera = None # global variable for webcam
+
+# 1. webcam setup + streaming function
+def generate_frames():
+    global camera
+    if camera is None or not camera.isOpened():
+        camera = cv2.VideoCapture(0) # open camera, 0 for default webcam
+        if not camera.isOpened():
+            print("Error: Could not open webcam.")
+            return
+
+    while True:
+        success, frame = camera.read()
+        if not success:
+            break
+        ret, buffer = cv2.imencode('.jpg', frame) # reads frame from webcam
+        frame = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n') # reads frame from the webcam (convert to JPEG bytes)
+        time.sleep(3) # Adjust for desired frame rate (seconds b/w each frame)
+
+# 2. flask route for video feed (sends to frontend in order to display as video)
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(), 
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
+                    # multipart is used to send continuous images (stream)
+
+# 3. stop the webcam
+@app.route('/stop_webcam', methods=['POST'])
+def stop_webcam():
+    global camera
+    if camera and camera.isOpened():
+        camera.release()
+        camera = None
+        print("Webcam released.")
+    return jsonify({"status": "Webcam stopped"})
+
+# --- Process Uploaded Videos --- #
+@app.route('/analyze_video', methods=['POST'])
+def analyze_video():
+    print('Analyzing video')
+    try: 
+
+        # Get JSON data from frontend
+        data = request.get_json()
+            
+        if not data:
+            return jsonify({'success': False, 'error': 'No data received'}), 400
+        
+        video_data = data.get('videoData', {})
+        base64_data = video_data.get('base64')
+        mime_type = video_data.get('mimeType', 'video/mp4')
+
+        # define prompt    
+        prompt = """
+        You are an expert fitness trainer analyzing exercise form from a video. 
+        Please provide detailed feedback on the user's exercise technique.
+
+        Analyze the following aspects:
+        1. Overall form and posture
+        2. Movement patterns and technique
+        3. Common mistakes or areas for improvement
+        4. Safety considerations
+        5. Specific recommendations for better form
+
+        Provide your feedback in a clear, encouraging, and constructive manner.
+        Focus on actionable advice that will help the user improve their exercise technique.
+        """
+
+        # put into parts for gemini
+        parts = [{"text": prompt}]
+
+        # add video to prompt
+        parts.append({
+            "inlineData": {
+                "mimeType": mime_type,
+                "data": base64_data
+            }
+        })
+
+        # Construct the payload for Gemini API
+        payload = {
+            "contents": [{
+                "role": "user",
+                "parts": parts
+            }]
+        }
+
+        # API endpoint URL
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GOOGLE_API_KEY}"
+        
+        # Make the API request to Gemini
+        response = requests.post(
+            api_url,
+            headers={'Content-Type': 'application/json'},
+            json=payload,
+            timeout=120  # Longer timeout for video processing
+        )
+        
+        # Check if request was successful
+        if not response.ok:
+            error_data = response.json() if response.content else {}
+            return jsonify({
+                'success': False,
+                'error': f'Gemini API error: {response.status_code} {response.reason}',
+                'details': error_data
+            }), 500
+        
+        # Parse the response
+        result = response.json()
+
+        print('parsed')
+        
+        # Extract the generated text
+        if (result.get('candidates') and 
+            len(result['candidates']) > 0 and
+            result['candidates'][0].get('content') and
+            result['candidates'][0]['content'].get('parts') and
+            len(result['candidates'][0]['content']['parts']) > 0):
+            
+            feedback = result['candidates'][0]['content']['parts'][0]['text']
+            return jsonify({
+                'success': True,
+                'feedback': feedback
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'No meaningful response from Gemini. Please try a different prompt or video.'
+            })
+            
+    except requests.exceptions.Timeout:
+        return jsonify({
+            'success': False,
+            'error': 'Request timed out. The video might be too large or complex.'
+        }), 408
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            'success': False,
+            'error': f'Network error: {str(e)}'
+        }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Server error: {str(e)}'
+        }), 500
+
+if __name__ == '__main__':
+    app.run(debug=True)
