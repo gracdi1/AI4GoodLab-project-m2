@@ -153,6 +153,58 @@
       .feedback-section.show {
           display: block;
       }
+
+      /* Video analysis container */
+      #video-analysis-container {
+        display: none;
+        margin-top: 2rem;
+        padding: 1.5rem;
+        border: 1px solid #ddd;
+        border-radius: 0.5rem;
+        background: #fff;
+      }
+
+      #video-analysis-container.show {
+        display: flex;
+        gap: 2rem;
+        align-items: flex-start;
+      }
+
+      .video-display {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .video-display video {
+        width: 100%;
+        max-width: 400px;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      }
+
+      .analysis-feedback {
+        flex: 1;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 0.5rem;
+        border: 1px solid #e9ecef;
+      }
+
+      .analysis-feedback h3 {
+        margin-top: 0;
+        color: #495057;
+      }
+
+      .analyzing-spinner {
+        display: inline-block;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
     </style>
   </head>
   <body>
@@ -226,11 +278,17 @@
         <button id="stopWebcamButton" class="secondary">Stop Webcam</button>
       </div>
 
-      <!-- Add container for uploaded video (add this after your existing webcam container) -->
-      <div id="uploaded-video-container" class="hidden">
-        <video id="uploadedVideo" controls style="width: 100%; max-width: 640px; border-radius: 0.25rem; margin-top: 1rem;"></video>
-        <div class="button-group">
-          <button id="analyzeUploadBtn" class="btn btn-success">Analyze Video</button>
+      <!-- Video Analysis Container -->
+      <div id="video-analysis-container">
+        <div class="video-display">
+          <h3>Uploaded Video</h3>
+          <video id="analysis-video" controls></video>
+        </div>
+        <div class="analysis-feedback">
+          <h3>Analysis Results</h3>
+          <div id="analysis-content">
+            <span class="analyzing-spinner">⟳</span> Analyzing video...
+          </div>
         </div>
       </div>
     </section>
@@ -384,62 +442,73 @@
         document.getElementById('errorMessage').style.display = 'none';
 
         if (!videoFile) {
-          feedbackContent.textContent = "Please enter a YouTube video URL or upload a video file.";
-          feedbackContent.style.borderColor = '#ef4444'; // Red border for error
+          showError("Please select a video file first.");
           return;
         }
 
         if (videoFile.size > MAX_FILE_SIZE_BYTES) {
-          throw new Error(`File is too large. Max allowed is ~${Math.round(MAX_FILE_SIZE_BYTES / (1024 * 1024))}MB.`);
+          showError(`File is too large. Max allowed is ~${Math.round(MAX_FILE_SIZE_BYTES / (1024 * 1024))}MB.`);
+          return;
         }
 
-        // Read the file as a Base64 string (for gemini flash) -> should I convert it before or after sending
-        const base64Data = await new Promise((resolve, reject) => {
+        // Show the video analysis container
+        const container = document.getElementById('video-analysis-container');
+        const analysisVideo = document.getElementById('analysis-video');
+        const analysisContent = document.getElementById('analysis-content');
+        
+        // Display the uploaded video
+        const videoURL = URL.createObjectURL(videoFile);
+        analysisVideo.src = videoURL;
+        
+        // Show container and reset feedback content
+        container.classList.add('show');
+        analysisContent.innerHTML = '<span class="analyzing-spinner">⟳</span> Analyzing video...';
+
+        try {
+          // Read the file as Base64
+          const base64Data = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result.split(',')[1]); // Get base64 part
             reader.onerror = error => reject(error);
             reader.readAsDataURL(videoFile);
-        });
+          });
 
-        //const formData = new FormData();
-        //formData.append('video', videoFile);
-        try {
           let requestData = {
             videoData: {
               base64: base64Data,
-            mimeType: videoFile.type,
-            fileName: videoFile.name
+              mimeType: videoFile.type,
+              fileName: videoFile.name
             }
-        };
+          };
 
-        console.log('Sending request data:', requestData);
+          console.log('Sending request data:', requestData);
 
-        // send to app.py
-        const response = await fetch('/analyze_video', {
-          method: "POST",
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(requestData)
-        });
+          // Send to app.py
+          const response = await fetch('/analyze_video', {
+            method: "POST",
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+          });
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
 
-        const data = await response.json();
+          const data = await response.json();
 
-        if (data.success) {
-          showFeedback(data.feedback);
-        } else {
-          showError(data.error || 'Analysis failed. Please try again.');
-        }
-      } 
+          if (data.success) {
+            // Display the feedback in the analysis container
+            analysisContent.innerHTML = `<div style="white-space: pre-wrap;">${data.feedback}</div>`;
+          } else {
+            analysisContent.innerHTML = `<div style="color: #dc3545;">❌ ${data.error || 'Analysis failed. Please try again.'}</div>`;
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          analysisContent.innerHTML = `<div style="color: #dc3545;">❌ Network error. Please check your connection and try again.</div>`;
+        } 
       
-      catch (error) {
-        console.error('Error:', error);
-        showError('Network error. Please check your connection and try again.');
-      }
 
       }
 
