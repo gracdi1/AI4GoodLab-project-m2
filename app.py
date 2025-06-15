@@ -93,6 +93,7 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 current_exercise_steps = []
 current_exercise_index = 0
 vlm_model = None # To be initialized with gemini-pro-vision
+llm_to_vlm = None
 '''
     initialize variables that will be used for the step-by-step instructions feature
 '''
@@ -312,13 +313,17 @@ def ask_llm():
         current_exercise_index = 0
 
         # return JSON (exercises, steps, etc) to Frontend (to be displayed on screen)
-        return jsonify({
+        global llm_to_vlm
+        response_data = {
             "exercise": exercise.group(1) if exercise else "",
             "prosthetic": prosthetic.group(1) if prosthetic else "",
             "purpose": purpose.group(1) if purpose else "",
             "mistake": mistakes.group(1) if mistakes else "",
             "steps": current_exercise_steps
-        })
+        }
+
+        llm_to_vlm = response_data
+        return jsonify(llm_to_vlm)
     
     # fail safe for any error (eg: LLM API failure)
     except Exception as e:
@@ -457,6 +462,7 @@ def analyze_video():
     print('Analyzing video')
     try: 
 
+        global llm_to_vlm
         # Get JSON data from frontend
         data = request.get_json()
             
@@ -467,21 +473,16 @@ def analyze_video():
         base64_data = video_data.get('base64')
         mime_type = video_data.get('mimeType', 'video/mp4')
 
+        print('here')
+        print(llm_to_vlm)
+
         # define prompt    
-        prompt = """
-        You are an expert fitness trainer analyzing exercise form from a video. 
-        Please provide detailed feedback on the user's exercise technique.
-
-        Analyze the following aspects:
-        1. Overall form and posture
-        2. Movement patterns and technique
-        3. Common mistakes or areas for improvement
-        4. Safety considerations
-        5. Specific recommendations for better form
-
-        Provide your feedback in a clear, encouraging, and constructive manner.
-        Focus on actionable advice that will help the user improve their exercise technique.
+        prompt = f""" You are an exercise coach. The person is performing this exercise: {llm_to_vlm['exercise']}.
+        Are they correctly performing these exercise steps: {llm_to_vlm['steps']}?
+        Provide corrections that the person should do to accurately execute the exercise steps.
+        Correct these common mistakes: {llm_to_vlm['mistake']}
         """
+        print(prompt)
 
         # put into parts for gemini
         parts = [{"text": prompt}]
