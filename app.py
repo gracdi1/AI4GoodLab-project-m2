@@ -101,90 +101,100 @@ llm_to_vlm = None
 # --- RAG Setup (Load PDFs and Create Vector Store) ---
 vectorstore = None # store vector database (from contents of PDFs) + search for info
 llm = None # store LLM (text-only Gemini model)
-qa_chain = None # RAG chain: combines vectorstore + LLM (q-a pipeline)
+current_retriever = None
+# qa_chain = None # RAG chain: combines vectorstore + LLM (q-a pipeline)
 
-def setup_llm_and_rag():
-    global vectorstore, llm, qa_chain, vlm_model
+def setup_llm_and_rag(pdf_file_path=None, mode='default_doc'):
+    global vectorstore, llm, vlm_model # qa_chain
+
+    if mode == 'default_doc':
+        # Initialize Google Gemini LLM (for text-based recommendation)
+        try:
+            llm = GoogleGenerativeAI(model="gemini-2.0-flash")
+            print("Google Gemini LLM for text initialized successfully.")
+        except Exception as e:
+            print(f"Error initializing text LLM: {e}")
+            return False
+
+        # Initialize Google Gemini VLM (for vision-based analysis)
+        try:
+            vlm_model = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
+            print("Google Gemini VLM initialized successfully.")
+        except Exception as e:
+            print(f"Error initializing VLM: {e}")
 
     # 1. Load your PDF files
-    pdf_folder = r"./data"
-    print("Using pdf_folder path:", pdf_folder)
-    pdf_paths = [os.path.join(pdf_folder, f) for f in os.listdir(pdf_folder) if f.endswith(".pdf")]
-    
     documents = []
-    for pdf_path in pdf_paths:
-        if os.path.exists(pdf_path):
-            try:
-                loader = PyPDFLoader(pdf_path)
-                documents.extend(loader.load())
-            except Exception as e:
-                print(f"Failed to load {pdf_path}: {e}")
-        else:
-            print(f"Warning: PDF file not found at {pdf_path}")
+    if mode == 'default_doc': # if user lists exercises
+        pdf_folder = r"./data"
+        print("Using pdf_folder path:", pdf_folder)
+        pdf_paths = [os.path.join(pdf_folder, f) for f in os.listdir(pdf_folder) if f.endswith(".pdf")]
+        for pdf_path in pdf_paths:
+            if os.path.exists(pdf_path):
+                try:
+                    loader = PyPDFLoader(pdf_path)
+                    documents.extend(loader.load())
+                except Exception as e:
+                    print(f"Failed to load {pdf_path}: {e}")
+            else:
+                print(f"Warning: PDF file not found at {pdf_path}")
+    elif pdf_file_path and os.path.exists(pdf_file_path): # use pdf instead
+        print(f"Loading uploaded PDF: {pdf_file_path}")
+        loader = PyPDFLoader(pdf_file_path)
+        documents = loader.load()
+    else: # error
+        print("No valid PDF path provided.")
+        return False
     ''' 
         loads booklet as a list of pages 
         each page is a separate Document obj
     '''
 
-    # 2. Split documents into chunks
+    for doc in documents:
+        doc.metadata["category"] = mode
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    texts = []
     texts = text_splitter.split_documents(documents)
-    ''' 
-        (~1000 characters), essential for RAG precision 
-    '''
-
-    # 3. Create embeddings using GoogleGenerativeAIEmbeddings
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    '''
-        text chunks -> high-dimensional numerical vectors (needed for semantic search)
-    '''
-
-    # 4. Create a vector store from the embeddings
-    vectorstore = Chroma.from_documents(texts, embeddings)
-    print("Vector store created successfully.") # Chroma database = fast, relevant look-up
-
-    # 5. Initialize Google Gemini LLM (for text-based recommendation)
     try:
-        # Use a text-only model for initial recommendation
-        llm = GoogleGenerativeAI(model="gemini-2.0-flash") # Updated to flash for potentially faster response
-        print("Google Gemini LLM for text initialized successfully.")
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        vectorstore = Chroma.from_documents(texts, embeddings) 
+        print(f"Stored {len(texts)} chunks in mode '{mode}'")
+        return True
     except Exception as e:
-        print(f"Error initializing text LLM: {e}")
-        llm = None
-    '''
-        text-only Gemini model
-        generate answers based on booklet content + user questions
-    '''
+        print(f"Error creating QA chain: {e}")
+        return False
 
-    # 6. Initialize Google Gemini VLM (for vision-based analysis)
+
+# upload PDF endpoint and run RAG setup (loads pDF, embeds docs, initialize LLMs)
+@app.route('/upload_pdf', methods=['POST'])
+def upload_pdf():
+    if 'pdf_file' not in request.files:
+        return jsonify({"error": "No file part in request"}), 400
+
+    file = request.files['pdf_file']
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({"error": "Only PDF files are allowed"}), 400
+
     try:
-        vlm_model = ChatGoogleGenerativeAI(model="gemini-2.0-flash") # Use a model with vision for frame analysis
-        print("Google Gemini VLM initialized successfully.")
-    except Exception as e:
-        print(f"Error initializing VLM: {e}")
-        vlm_model = None
-    '''
-        handles image inputs AND text 
-    '''
+        save_path = os.path.join("uploads", file.filename)
+        file.save(save_path)
 
-    # 7. Create the RAG chain
-    if llm and vectorstore:
-        qa_chain = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="stuff",
-            retriever=vectorstore.as_retriever()
-        )
-        print("RAG QA chain created.")
-    else:
-        print("Could not create RAG QA chain. Check LLM and vectorstore setup.")
-    '''
-        combines the vector store (find relevant text) + LLM (generate answers)
-        QUESTION: will we be using RAG for our VLM as well?
-    '''
+        success = setup_llm_and_rag(pdf_file_path=save_path, mode='uploaded_pdf')
+
+        if success:
+            return jsonify({"message": f"PDF '{file.filename}' uploaded and RAG system initialized."}), 200
+        else:
+            return jsonify({"error": "Failed to initialize RAG system with uploaded PDF"}), 500
+
+    except Exception as e:
+        return jsonify({"error": f"Upload failed: {str(e)}"}), 500
+
 
 # Run RAG setup on server start
-with app.app_context():
-    setup_llm_and_rag() 
+# with app.app_context():
+    # setup_llm_and_rag() 
 '''
     initialize LangChain RAG pipeline:
     loads pDF, embeds docs, initialize LLMs, set up qa_chain for user queries
@@ -193,6 +203,12 @@ with app.app_context():
 # display main webpage (html file from templates folder)
 @app.route('/')
 def index():
+    # clean up uploaded files
+    upload_folder = "uploadeds"
+    if os.path.exists(upload_folder):
+        shutil.rmtree(upload_folder)
+        os.makedirs(upload_folder)  # recreate empty folder
+        
     return render_template('index.html')
 
 # main function: POST reqs, take in user prompt, queries RAG, parses LLM output
@@ -218,9 +234,6 @@ def ask_llm():
     exercise_purpose = ['Strength', 'Mobility', 'Balance', 'Agility'] # needed?
     if not user_exercises:
         return jsonify({"error": "No exercises provided"}), 400
-
-    if not qa_chain: # ensure qa_chain is set up
-        return jsonify({"error": "LLM or RAG not initialized. Please check server logs and API key."}), 500
 
     # 2. build the prompt: instructs the LLM what to do 
     ''' outline:
@@ -271,6 +284,13 @@ def ask_llm():
             RAG process: search the vectorstore + pass results to LLM
             returns a dictionary with "result" as key based on PDFs
         '''
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+        qa_chain = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=retriever
+        )
+        
         response = qa_chain.invoke({"query": prompt})
         exercise_recommendation_full_text = response.get("result", "Could not find a suitable exercise.")
 
@@ -563,4 +583,9 @@ def analyze_video():
         }), 500
 
 if __name__ == '__main__':
+    if os.path.exists("./data"):
+        print("Initializing with default PDFs from /data...")
+        setup_llm_and_rag(mode='default_doc')
+    else:
+        print("No default PDF folder found. Upload required.")
     app.run(debug=True)

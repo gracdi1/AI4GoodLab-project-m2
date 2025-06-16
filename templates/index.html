@@ -90,6 +90,40 @@
         cursor: not-allowed;
       }
 
+      /* Styles for the file upload input (adjusted for inline use) */
+      .file-upload-inline-container {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .file-upload-inline-container input[type="file"] {
+        display: none;
+      }
+      .file-upload-inline-container .custom-file-upload {
+        display: inline-block;
+        padding: 0.6rem 1rem;
+        border: none;
+        border-radius: 0.25rem;
+        background: #007bff;
+        color: #fff;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .file-upload-inline-container .custom-file-upload:hover {
+        background: #0269d6;
+      }
+      .file-upload-inline-container .file-name {
+          margin-left: 0.5rem;
+          font-style: italic;
+          color: #555;
+          flex-grow: 1;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+      }
+
       /* -----------  EXERCISE AREA  ----------- */
       .exercise-steps-container {
         margin-top: 1rem;
@@ -208,7 +242,7 @@
     </style>
   </head>
   <body>
-    <h1>AI Health Assistant</h1>
+    <h1>Your AI Rehab Assistant</h1>
 
     <!--  TAB CONTROLS  -->
     <div class="tabs">
@@ -231,7 +265,16 @@
       <p>List the exercises reccomended to you by your physiotherapist:</p>
       <textarea id="exercisesInput" placeholder="e.g., Hamstring Stretch, Hip Extension on Side, Side Stepping."></textarea>
       <br />
-      <button id="askButton">Get Exercise Steps</button>
+      <div class="button-row">
+        <div class="file-upload-inline-container">
+            <input type="file" name="pdf_file" id="inlinePdfFileInput" accept=".pdf">
+            <label for="inlinePdfFileInput" class="custom-file-upload">Upload PDF</label>
+            <span id="inlineFileNameDisplay" class="file-name">No file chosen</span>
+        </div>
+
+        <button id="askButton">Get Recommendation</button>
+      </div>
+      <p id="inlineUploadStatus" style="margin-top: 0.5rem; font-weight: bold;"></p>
 
       <div id="recommendationResult" style="margin-top: 1rem;">
         <p><strong>Exercise:</strong> <span id="exerciseOutput">N/A</span></p>
@@ -646,6 +689,50 @@
           state.frameIntervalId = null;
           state.processingFrames = false;
         }
+      }
+
+      /********************************************
+       * UPLOAD FUNCTIONALITY (INLINE)
+       *******************************************/
+      document.getElementById('inlinePdfFileInput').addEventListener('change', function() {
+          const fileNameDisplay = document.getElementById('inlineFileNameDisplay');
+          if (this.files.length > 0) {
+              fileNameDisplay.textContent = this.files[0].name;
+              // Automatically upload when file is selected
+              uploadPdfFile(this.files[0]);
+          } else {
+              fileNameDisplay.textContent = 'No file chosen';
+          }
+      });
+
+      async function uploadPdfFile(file) {
+          const uploadStatus = document.getElementById('inlineUploadStatus');
+          uploadStatus.textContent = 'Uploading...';
+          uploadStatus.style.color = '#007bff';
+
+          const formData = new FormData();
+          formData.append('pdf_file', file);
+
+          try {
+              const response = await fetch('/upload_pdf', {
+                  method: 'POST',
+                  body: formData
+              });
+
+              const data = await response.json();
+
+              if (response.ok) {
+                  uploadStatus.textContent = data.message || 'File uploaded successfully!';
+                  uploadStatus.style.color = '#28a745'; // Green for success
+              } else {
+                  uploadStatus.textContent = data.error || 'Error uploading file.';
+                  uploadStatus.style.color = '#dc3545'; // Red for error
+              }
+          } catch (error) {
+              console.error('Upload error:', error);
+              uploadStatus.textContent = 'Network error or server unreachable.';
+              uploadStatus.style.color = '#dc3545'; // Red for error
+          }
       }
 
       /********************************************
