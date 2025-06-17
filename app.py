@@ -191,6 +191,25 @@ def upload_pdf():
     except Exception as e:
         return jsonify({"error": f"Upload failed: {str(e)}"}), 500
 
+@app.route('/remove_pdf', methods=['POST'])
+def remove_pdf():
+    data = request.get_json()
+    filename = data.get('filename')
+
+    if not filename:
+        return jsonify({"error": "Filename not provided"}), 400
+
+    file_path = os.path.join("uploads", filename)
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+            return jsonify({"message": f"PDF '{filename}' removed successfully."}), 200
+        except Exception as e:
+            return jsonify({"error": f"Error deleting file: {str(e)}"}), 500
+    else:
+        return jsonify({"error": "File does not exist"}), 404
+
+
 
 # Run RAG setup on server start
 # with app.app_context():
