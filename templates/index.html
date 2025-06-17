@@ -265,12 +265,12 @@
         <option value="left">Left leg</option>
       </select>
       <br />
-      <p>List the exercises reccomended to you by your physiotherapist:</p>
+      <p>List the exercises recommended to you by your physiotherapist:</p>
       <textarea id="exercisesInput" placeholder="e.g., Hamstring Stretch, Hip Extension on Side, Side Stepping."></textarea>
       <br />
       <div class="button-row">
         <button id="askButton">Get Recommendation</button>
-
+        <br />
         <div class="file-upload-inline-container">
             <input type="file" name="pdf_file" id="inlinePdfFileInput" accept=".pdf">
             <label for="inlinePdfFileInput" class="custom-file-upload">Upload PDF</label>
@@ -278,6 +278,7 @@
         </div>
 
         <button id="cancelUploadBtn">Cancel Upload</button>
+        <button id="nextExerciseButton" class="hidden secondary">Next Exercise</button>
       </div>
       <p id="inlineUploadStatus" style="margin-top: 0.5rem; font-weight: bold;"></p>
 
@@ -286,7 +287,6 @@
         <p><strong>Prosthetic limb type(s):</strong> <span id="prostheticOutput">N/A</span></p>
         <p><strong>Exercise Purpose:</strong> <span id="purposeOutput">N/A</span></p>
         <p><strong>Common Mistakes:</strong> <span id="mistakesOutput">N/A</span></p>
-        <!-- <p><strong>Document(s) used:</strong> <span id="docOutput">N/A</span></p> -->
 
         <div class="exercise-steps-container">
           <h4>Exercise Steps:</h4>
@@ -379,44 +379,58 @@
       }
 
       /********************************************
-       * RECOMMENDATION FLOW
-       *******************************************/
-      document.getElementById('askButton').addEventListener('click', fetchRecommendation);
-
-      async function fetchRecommendation() {
-        const exercises = document.getElementById('exercisesInput').value.trim();
-        if (!exercises) return alert('Please enter your exercises.');
-
-        const prosthetic= document.getElementById('prostheticInput').value.trim();
+      * MULTI-EXERCISE SUPPORT
+      *******************************************/
+      document.getElementById('nextExerciseButton').addEventListener('click', () => {
+        if (currentExerciseIndex + 1 < exerciseQueue.length) {
+          currentExerciseIndex++;
+          loadExercise(exerciseQueue[currentExerciseIndex]);
+        } else {
+          alert('All exercises completed!');
+          toggle('nextExerciseButton', true);
+        }
+      });
+    
+      document.getElementById('askButton').addEventListener('click', async () => {
+        const exercisesRaw = document.getElementById('exercisesInput').value.trim();
+        if (!exercisesRaw) return alert('Please enter your exercises.');
+    
+        exerciseQueue = exercisesRaw.split(',').map(e => e.trim()).filter(Boolean);
+        if (!exerciseQueue.length) return alert('Please enter at least one valid exercise.');
+    
+        currentExerciseIndex = 0;
+        loadExercise(exerciseQueue[currentExerciseIndex]);
+        toggle('nextExerciseButton', false);
+      });
+    
+      async function loadExercise(exerciseName) {
+        const prosthetic = document.getElementById('prostheticInput').value.trim();
         if (!prosthetic) return alert('Please enter your prosthetic type.');
-
-        const leg= document.getElementById('legInput').value.trim();
+    
+        const leg = document.getElementById('legInput').value.trim();
         if (!leg) return alert('Please enter the leg side.');
 
         // reset UI
         resetUI();
-        setText('exerciseOutput', 'Thinking...');
-        setText('prostheticOutput', 'Verifying...');
+        setText('exerciseOutput', 'Thinking...'); // change for demo day
+        setText('prostheticOutput', 'Verifying...'); // change for demo day
         setText('purposeOutput', 'Analyzing...');
         setText('mistakesOutput', 'Reading...');
-        // setText('docOutput', 'Retrieving...');
 
         try {
-          console.log({ exercises, prosthetic, leg });
           const res = await fetch('/ask_llm', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ exercises, prosthetic, leg }),
+            body: JSON.stringify({ exercises: exerciseName, prosthetic, leg })
           });
+    
           const data = await res.json();
-
           if (data.error) throw new Error(data.error);
 
           setText('exerciseOutput', data.exercise ?? 'Unknown');
           setText('prostheticOutput', data.prosthetic ?? 'Unknown');
           setText('purposeOutput', data.purpose ?? 'Unknown');
           setText('mistakesOutput', data.mistake ?? 'Unknown');
-          // setText('docOutput', data.mistake ?? 'Unknown');
 
           state.steps = data.steps ?? [];
           state.currentStep = 0;
@@ -425,17 +439,13 @@
           toggle('startExerciseButton', false);
           toggle('uploadVideoButton', false);
 
-          // if (data.prosthetic === 'Yes' && state.steps.length) {
-            // toggle('startExerciseButton', false);
-            // toggle('uploadVideoButton', false);
-          // }
         } catch (err) {
           console.error(err);
           setText('exerciseOutput', `Error: ${err.message}`);
           setText('prostheticOutput', '✖');
           setText('purposeOutput', '✖');
           setText('mistakesOutput', '✖');
-          // setText('docOutput', '✖');
+
           document.getElementById('exerciseStepsList').innerHTML = '<li>Failed to load steps.</li>';
         }
       }
@@ -699,37 +709,6 @@
         }
       }
 
-      /********************************************
-       * SETUP RAG-LLM USING PROSTHETIC TYPE 
-  
-      document.getElementById('prostheticInput').addEventListener('change', async function () {
-        const prosthetic = this.value;
-
-        if (!prosthetic) return;
-
-        try {
-          const response = await fetch('/set_prosthetic', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prosthetic })
-          });
-
-          const data = await response.json();
-
-          if (data.error) {
-            console.error("Error setting prosthetic:", data.error);
-            alert("Error loading prosthetic documents.");
-          } else {
-            console.log("RAG initialized for:", prosthetic);
-            alert(`Loaded documents for: ${prosthetic}`);
-          }
-        } catch (err) {
-          console.error("Failed to send prosthetic to backend:", err);
-          alert("Server error. Please try again.");
-        }
-      });
-
-      *******************************************/
 
       /********************************************
        * UPLOAD FUNCTIONALITY (INLINE)

@@ -282,9 +282,7 @@ def ask_llm():
         - add feedback option (provide alternatives) ?
     '''
     try:
-        prompt = ( # should we also add when they were released from physio??
-            # for testing purposes add a line that states which documents were used
-            
+        prompt = (
             f"You are a virtual rehabilitation assistant "
             f"to help guide users with lower limb prosthetics through their rehabilitation exercises. "
             f"Given the following exercise(s): {user_exercises} and"
