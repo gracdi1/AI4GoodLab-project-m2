@@ -270,7 +270,7 @@
       <br />
       <div class="button-row">
         <button id="askButton">Get Recommendation</button>
-        <br />
+
         <div class="file-upload-inline-container">
             <input type="file" name="pdf_file" id="inlinePdfFileInput" accept=".pdf">
             <label for="inlinePdfFileInput" class="custom-file-upload">Upload PDF</label>
@@ -701,7 +701,7 @@
 
       /********************************************
        * SETUP RAG-LLM USING PROSTHETIC TYPE 
-       *******************************************/
+  
       document.getElementById('prostheticInput').addEventListener('change', async function () {
         const prosthetic = this.value;
 
@@ -728,6 +728,8 @@
           alert("Server error. Please try again.");
         }
       });
+
+      *******************************************/
 
       /********************************************
        * UPLOAD FUNCTIONALITY (INLINE)

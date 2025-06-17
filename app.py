@@ -28,7 +28,6 @@ import requests
 from dotenv import load_dotenv
 load_dotenv() # Call this at the very beginning
 
-print('DEBUG: GOOGLE_API_KEY', os.getenv('GOOGLE_API_KEY'))
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
 # Google Generative AI imports
@@ -90,6 +89,7 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 '''
 
 # --- Global Variables for Exercise State ---
+prosthetic_types = ["transtibial", "transfemoral"]
 current_exercise_steps = []
 current_exercise_index = 0
 vlm_model = None # To be initialized with gemini-pro-vision
@@ -103,10 +103,9 @@ global_mode = None
 vectorstore = None # store vector database (from contents of PDFs) + search for info
 llm = None # store LLM (text-only Gemini model)
 current_retriever = None
-# qa_chain = None # RAG chain: combines vectorstore + LLM (q-a pipeline)
 
-def setup_llm_and_rag(pdf_file_path=None, mode='default_doc', user_prosthetic=None):
-    global vectorstore, llm, vlm_model, global_mode # qa_chain
+def setup_llm_and_rag(pdf_file_path=None, mode='default_doc'):
+    global vectorstore, llm, vlm_model, global_mode
     
     if mode == 'default_doc':
         # Initialize Google Gemini LLM (for text-based recommendation)
@@ -124,11 +123,6 @@ def setup_llm_and_rag(pdf_file_path=None, mode='default_doc', user_prosthetic=No
         except Exception as e:
             print(f"Error initializing VLM: {e}")
             return False
-        
-    # ensure prosthetic is inputed
-    if not user_prosthetic and mode == 'default_doc':
-        print("Error: No prosthetic type provided for default mode.")
-        return False
 
     # Load your PDF files
     documents = []
@@ -139,26 +133,37 @@ def setup_llm_and_rag(pdf_file_path=None, mode='default_doc', user_prosthetic=No
             print(f"Loading uploaded PDF: {pdf_file_path}")
             loader = PyPDFLoader(pdf_file_path)
             documents = loader.load()
+            for doc in documents:
+                doc.metadata["category"] = mode
         else: # error
             print("No valid PDF path provided.")
             return False
 
     elif mode == 'default_doc': # if user lists exercises but no pdf
         global_mode = mode
-        pdf_folder = os.path.join("data", user_prosthetic)
-        print("Using pdf_folder path:", pdf_folder)
-        pdf_paths = [os.path.join(pdf_folder, f) for f in os.listdir(pdf_folder) if f.endswith(".pdf")]
-        for pdf_path in pdf_paths:
-            if os.path.exists(pdf_path):
-                try:
-                    loader = PyPDFLoader(pdf_path)
-                    documents.extend(loader.load())
-                    print(f"Path: \n {pdf_path}")
-                    print(len(documents))
-                except Exception as e:
-                    print(f"Failed to load {pdf_path}: {e}")
-            else:
-                print(f"Warning: PDF file not found at {pdf_path}")
+        for prosthetic_type in prosthetic_types:
+            pdf_folder = os.path.join("data", prosthetic_type)
+            print("Using pdf_folder path:", pdf_folder)
+            pdf_paths = [os.path.join(pdf_folder, f) for f in os.listdir(pdf_folder) if f.endswith(".pdf")]
+            
+            for pdf_path in pdf_paths:
+                if os.path.exists(pdf_path):
+                    try:
+                        loader = PyPDFLoader(pdf_path)
+                        loaded_docs = loader.load()
+                        
+                        # set category metadata for each loaded doc
+                        for doc in loaded_docs:
+                            doc.metadata["category"] = mode + prosthetic_type
+
+                        documents.extend(loaded_docs)
+                        print(f"Path: \n {pdf_path}")
+                        print(len(documents))
+                    
+                    except Exception as e:
+                        print(f"Failed to load {pdf_path}: {e}")
+                else:
+                    print(f"Warning: PDF file not found at {pdf_path}")
 
     else:
         print("Unknown mode or missing PDF.")
@@ -168,13 +173,6 @@ def setup_llm_and_rag(pdf_file_path=None, mode='default_doc', user_prosthetic=No
         loads booklet as a list of pages 
         each page is a separate Document obj
     '''
-
-    # tag metadata for prosthetic type and mode
-    for doc in documents:
-        if global_mode == 'uploaded_pdf':
-            doc.metadata["category"] = mode
-        elif global_mode == 'default_doc':
-            doc.metadata["category"] = mode + user_prosthetic # add the specific prosthetic category for default
     
     # split and embed documents based on mode
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
@@ -188,23 +186,6 @@ def setup_llm_and_rag(pdf_file_path=None, mode='default_doc', user_prosthetic=No
     except Exception as e:
         print(f"Error creating vectorstore: {e}")
         return False
-    
-# set prosthetic for default mode prior to initializing
-@app.route('/set_prosthetic', methods=['POST'])
-def set_prosthetic():
-    data = request.get_json()
-    user_prosthetic = data.get('prosthetic')
-
-    if not user_prosthetic:
-        return jsonify({"error": "Prosthetic type not provided"}), 400
-
-    success = setup_llm_and_rag(mode='default_doc', user_prosthetic=user_prosthetic)
-
-    if not success:
-        return jsonify({"error": "Failed to initialize LLM and vector store."}), 500
-
-    return jsonify({"message": f"Setup completed for prosthetic: {user_prosthetic}"}), 200
-
 
 # upload PDF endpoint and run RAG setup (loads pDF, embeds docs, initialize LLMs)
 @app.route('/upload_pdf', methods=['POST'])
@@ -277,8 +258,6 @@ def ask_llm():
         when a client sends a POST request to the Flask route (/ask_llm) the data 
         must be in JSON format and must contain a key called "symptoms" 
     '''
-    print(request.json)
-    print("*******************")
     
     user_prosthetic = request.json.get('prosthetic')
     if not user_prosthetic:
@@ -294,51 +273,50 @@ def ask_llm():
         return jsonify({"error": "No exercises provided"}), 400
 
     # 2. build the prompt: instructs the LLM what to do 
-    ''' outline:
-        - retrieve relevant exercises from doc based on symptoms
-        - provide clear steps
-        - indicate if supervision is required 
-        - fall back to general knowledge if PDF has no matches 
-
-        change to: 
-        - retrieve relevant exercises from doc if user has provided names of exercises 
-        - get exercises from user uploaded PDF if uploaded 
+    ''' 
+        - retrieve relevant exercises froms doc based on user's provided names of exercises 
         - explain the exercise + include common errors
-        - state  how to position selves in front of camera
-        - add feedback option (provide alternatives if this exercise is too difficult)
+
+        still need to add: 
+        - state how to position selves in front of camera
+        - add feedback option (provide alternatives) ?
     '''
     try:
         prompt = ( # should we also add when they were released from physio??
             # for testing purposes add a line that states which documents were used
+            
             f"You are a virtual rehabilitation assistant "
             f"to help guide users with lower limb prosthetics through their rehabilitation exercises. "
-            f"Given the following exercises: {user_exercises}, provide a step-by-step description of the exercises "
-            f"based on the user's type and location of prosthetic: {user_details}." 
-            f"Use the provided documents to find exercises descriptions. "
-            f"The description must be tailored towards the user's type of prosthetic."
-            f"Only provide one set of steps for each exercise."
-            f"If multiple descriptions of the same exercise exists, combine the information from each description "
-            f"in order to provide the most detailed set of exercise steps as possible"
-            f"If you could not find the exercise provided specific to the user's prosthetic, suggest an alternative based on the documents provided. "
-            f"For each exercise, also state the types of prosthetic limb that this exercise is used for. "
-            f"For each exercise, also state the purpose of the exercise. Choose the best option from {exercise_purpose}"
-            f"For each recommended exercise, also state commmon mistakes that individuals make "
-            f"when performing the exercises, so the user is aware. "
-            f"IMPORTANT: If you could not find any related exercise from documents provided, please state that no alternative was found. "
-            f"Additionally, provide the exercise steps clearly. "
-            f"Format your response as follows:\n\n"
+            f"Given the following exercise(s): {user_exercises} and"
+            f"the user's type and location of prosthetic: {user_details}, " 
+            f"use the provided documents to find step-by-step instructions for each exercise."
+
+            f"IMPORTANT INSTRUCTIONS:\n"
+            f"1. Only provide ONE VERSION of steps for each exercise.\n"
+            f"2. If multiple descriptions exist, merge them into one clean and non-redundant step-by-step list,"
+            f"   avoiding duplicated or alternative step formats. Do NOT list both versions."
+            f"3. ONLY IF the exercise is NOT found for this prosthetic type, suggest the closest alternative from the documents.\n"
+            f"4. For EACH exercise, include:\n"
+            f"   - Prosthetic limb type(s) that use this exercise\n"
+            f"   - The purpose (choose from {exercise_purpose})\n"
+            f"   - commmon mistakes that individuals make when performing the exercises\n"
+            f"   - Clear step-by-step instructions\n"
+            f"5. If nothing relevant is found, please use general knowledge.\n"
+
+            f"Please format your response like this:\n\n"
+
             f"Exercise: [Name of Exercise]\n"
-            f"Prosthetic limb type(s): [Type of Prosthetic Limb(s) that Utilize the Exercise]"
-            f"Purpose: [The purpose of the exercise]"
-            f"Common mistakes: [Common Mistakes the User Should be Aware of]"
-            f"Exercise 1:"
+            f"Prosthetic limb type(s): [e.g., transfemoral, transtibial]\n"
+            f"Purpose: [e.g., Balance, Mobility]\n"
+            f"Common mistakes: [Common mistakes that individuals make]\n"
             f"Steps:\n"
-            f"1. [Step 1 description]\n"
-            f"2. [Step 2 description]\n"
-            f"Exercise 2:"
+            f"1. [Step one]\n"
+            f"2. [Step two]\n"
             f"...\n\n"
-            f"Recommended Exercises:"
-        )
+
+            f"IMPORTANT: only provide ONE VERSION of steps for EACH exercise."
+             
+            )
         print(prompt)
         
         # 3. querry LLM chain via qa_chain (run the RAG process)
@@ -353,6 +331,7 @@ def ask_llm():
                 }
             )
         elif global_mode == 'default_doc': # if default mode then have the category = mode + prosthetic
+            print(user_prosthetic)
             retriever = vectorstore.as_retriever(search_kwargs={
                 "filter": {"category": global_mode + user_prosthetic}
                 }
@@ -372,7 +351,7 @@ def ask_llm():
         exercise = re.search(r"Exercise:\s*(.*?)\s*Prosthetic", exercise_recommendation_full_text)
         prosthetic = re.search(r"Prosthetic limb type\(s\):\s*(.*?)\s*Purpose", exercise_recommendation_full_text)
         purpose = re.search(r"Purpose:\s*(.*?)\s*Common mistakes", exercise_recommendation_full_text)
-        mistakes = re.search(r"Common mistakes:\s*(.*?)\s*Exercise", exercise_recommendation_full_text)
+        mistakes = re.search(r"Common mistakes:\s*(.*?)\s*Steps", exercise_recommendation_full_text)
         print(exercise, prosthetic, purpose, mistakes)
         
         # 4. parse response to get supervision and steps 
@@ -657,4 +636,9 @@ def analyze_video():
         }), 500
 
 if __name__ == '__main__':
+    if os.path.exists("./data"):
+        print("Initializing with default PDFs from /data...")
+        setup_llm_and_rag(mode='default_doc')
+    else:
+        print("No default PDF folder found. Upload required.")
     app.run(debug=True)
