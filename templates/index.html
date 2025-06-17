@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Health Assistant</title>
+    <title>VEHAB</title>
     <style>
       /* -----------  BASIC LAYOUT  ----------- */
       *,
@@ -15,7 +15,7 @@
         margin: 0;
         padding: 2rem;
         font-family: Arial, sans-serif;
-        background: #fafafa;
+        background: #ffffff;
         color: #222;
       }
       h1 {
@@ -32,7 +32,7 @@
         padding: 0.6rem 1.2rem;
         border: 1px solid #ccc;
         border-bottom: none;
-        background: #e9e9e9;
+        background: #214aff;
         border-radius: 0.5rem 0.5rem 0 0;
         cursor: pointer;
         transition: background 0.2s;
@@ -88,6 +88,40 @@
       button:disabled {
         background: #b6b6b6;
         cursor: not-allowed;
+      }
+
+      /* Styles for the file upload input (adjusted for inline use) */
+      .file-upload-inline-container {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .file-upload-inline-container input[type="file"] {
+        display: none;
+      }
+      .file-upload-inline-container .custom-file-upload {
+        display: inline-block;
+        padding: 0.6rem 1rem;
+        border: none;
+        border-radius: 0.25rem;
+        background: #007bff;
+        color: #fff;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .file-upload-inline-container .custom-file-upload:hover {
+        background: #0269d6;
+      }
+      .file-upload-inline-container .file-name {
+          margin-left: 0.5rem;
+          font-style: italic;
+          color: #555;
+          flex-grow: 1;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
       }
 
       /* -----------  EXERCISE AREA  ----------- */
@@ -153,15 +187,67 @@
       .feedback-section.show {
           display: block;
       }
+
+      /* Video analysis container */
+      #video-analysis-container {
+        display: none;
+        margin-top: 2rem;
+        padding: 1.5rem;
+        border: 1px solid #ddd;
+        border-radius: 0.5rem;
+        background: #fff;
+      }
+
+      #video-analysis-container.show {
+        display: flex;
+        gap: 2rem;
+        align-items: flex-start;
+      }
+
+      .video-display {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .video-display video {
+        width: 100%;
+        max-width: 400px;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      }
+
+      .analysis-feedback {
+        flex: 1;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 0.5rem;
+        border: 1px solid #e9ecef;
+      }
+
+      .analysis-feedback h3 {
+        margin-top: 0;
+        color: #495057;
+      }
+
+      .analyzing-spinner {
+        display: inline-block;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
     </style>
   </head>
   <body>
-    <h1>AI Health Assistant</h1>
+    <h1>VEHAB: Your AI Prosthetic Rehab Assistant</h1>
 
     <!--  TAB CONTROLS  -->
     <div class="tabs">
       <button class="tab-button active" data-target="exerciseTab">Exercise</button>
-      <button class="tab-button" data-target="anotherTab">Another Tab</button>
+      <button class="tab-button" data-target="recommendTab">Get Recommendations</button>
     </div>
 
     <!--  EXERCISE TAB  -->
@@ -170,24 +256,38 @@
       <p>Describe your prosthetic/amputation type to get tailored exercise recommendations:</p>
       <select id="prostheticInput">
         <option value="" disabled selected>Select prosthetic/amputation type</option>
-        <option value="transtibial_right">Transtibial (below knee) - Right leg</option>
-        <option value="transtibial_left">Transtibial (below knee) - Left leg</option>
-        <option value="transfemoral_right">Transfemoral (above knee) - Right leg</option>
-        <option value="transfemoral_left">Transfemoral (above knee) - Left leg</option>
+        <option value="transtibial">Transtibial (below knee)</option>
+        <option value="transfemoral">Transfemoral (above knee)</option>
+      </select>
+      <select id="legInput">
+        <option value="" disabled selected>Select right or left leg</option>
+        <option value="right">Right leg</option>
+        <option value="left">Left leg</option>
       </select>
       <br />
-      <p>List the exercises reccomended to you by your physiotherapist:</p>
+      <p>List the exercises recommended to you by your physiotherapist:</p>
       <textarea id="exercisesInput" placeholder="e.g., Hamstring Stretch, Hip Extension on Side, Side Stepping."></textarea>
       <br />
-      <button id="askButton">Get Exercise Steps</button>
-
+      <div class="button-row">
+        <button id="askButton">Get Recommendation</button>
+        <br />
+        <div class="file-upload-inline-container">
+          <input type="file" name="pdf_file" id="inlinePdfFileInput" accept=".pdf">
+          <label for="inlinePdfFileInput" class="custom-file-upload">Upload PDF</label>
+          <span id="inlineFileNameDisplay" class="file-name">No file chosen</span>
+        </div>
+    
+        <button id="cancelUploadBtn">Cancel Upload</button>
+        <button id="nextExerciseButton" class="hidden secondary">Next Exercise</button>
+      </div>
+      <p id="inlineUploadStatus" style="margin-top: 0.5rem; font-weight: bold;"></p>
+    
       <div id="recommendationResult" style="margin-top: 1rem;">
         <p><strong>Exercise:</strong> <span id="exerciseOutput">N/A</span></p>
         <p><strong>Prosthetic limb type(s):</strong> <span id="prostheticOutput">N/A</span></p>
         <p><strong>Exercise Purpose:</strong> <span id="purposeOutput">N/A</span></p>
         <p><strong>Common Mistakes:</strong> <span id="mistakesOutput">N/A</span></p>
-        <!-- <p><strong>Document(s) used:</strong> <span id="docOutput">N/A</span></p> -->
-
+    
         <div class="exercise-steps-container">
           <h4>Exercise Steps:</h4>
           <ul id="exerciseStepsList">
@@ -201,20 +301,18 @@
             <button id="nextStepButton" class="hidden secondary">Next Step</button>
             <button id="finishExerciseButton" class="hidden secondary">Finish Exercise</button>
           </div>
-
+    
           <div id="videoPreview" class="video-preview"></div>
         </div>
-
-        <!-- Error messages can appear anytime -->
+    
         <div id="errorMessage" class="error" style="display: none;"></div>
-        
-        <!-- Feedback section - only shows AFTER successful video analysis -->
+    
         <div id="feedbackSection" class="feedback-section" style="display: none;">
           <h3>Exercise Analysis Results</h3>
           <div id="feedbackContent" class="feedback-content"></div>
         </div>
       </div>
-
+    
       <div id="webcam-container" class="hidden">
         <h3>Exercise Supervision (Webcam)</h3>
         <video id="videoElement" autoplay muted playsinline></video>
@@ -225,21 +323,26 @@
         </div>
         <button id="stopWebcamButton" class="secondary">Stop Webcam</button>
       </div>
-
-      <!-- Add container for uploaded video (add this after your existing webcam container) -->
-      <div id="uploaded-video-container" class="hidden">
-        <video id="uploadedVideo" controls style="width: 100%; max-width: 640px; border-radius: 0.25rem; margin-top: 1rem;"></video>
-        <div class="button-group">
-          <button id="analyzeUploadBtn" class="btn btn-success">Analyze Video</button>
+    
+      <div id="video-analysis-container">
+        <div class="video-display">
+          <h3>Uploaded Video</h3>
+          <video id="analysis-video" controls></video>
+        </div>
+        <div class="analysis-feedback">
+          <h3>Analysis Results</h3>
+          <div id="analysis-content">
+            <span class="analyzing-spinner">⟳</span> Analyzing video...
+          </div>
         </div>
       </div>
     </section>
 
 
     <!--  SECOND TAB  -->
-    <section id="anotherTab" class="tab-content hidden">
-      <h2>Another Tab</h2>
-      <p>Put your secondary content here.</p>
+    <section id="recommendTab" class="tab-content hidden">
+      <h2>Get Recommendations</h2>
+      <p>Get basic exercises based on recovery timeline, skill, and prosthetic type</p>
     </section>
 
     <!--  SCRIPT AREA  -->
@@ -275,62 +378,78 @@
       /********************************************
        * RECOMMENDATION FLOW
        *******************************************/
-      document.getElementById('askButton').addEventListener('click', fetchRecommendation);
 
-      async function fetchRecommendation() {
-        const exercises = document.getElementById('exercisesInput').value.trim();
-        if (!exercises) return alert('Please enter your exercises.');
-
-        const prosthetic= document.getElementById('prostheticInput').value.trim();
+      /********************************************
+      * MULTI-EXERCISE SUPPORT
+      *******************************************/
+      let exerciseQueue = [];
+      let currentExerciseIndex = 0;
+    
+      document.getElementById('nextExerciseButton').addEventListener('click', () => {
+        if (currentExerciseIndex + 1 < exerciseQueue.length) {
+          currentExerciseIndex++;
+          loadExercise(exerciseQueue[currentExerciseIndex]);
+        } else {
+          alert('All exercises completed!');
+          toggle('nextExerciseButton', true);
+        }
+      });
+    
+      document.getElementById('askButton').addEventListener('click', async () => {
+        const exercisesRaw = document.getElementById('exercisesInput').value.trim();
+        if (!exercisesRaw) return alert('Please enter your exercises.');
+    
+        exerciseQueue = exercisesRaw.split(',').map(e => e.trim()).filter(Boolean);
+        if (!exerciseQueue.length) return alert('Please enter at least one valid exercise.');
+    
+        currentExerciseIndex = 0;
+        loadExercise(exerciseQueue[currentExerciseIndex]);
+        toggle('nextExerciseButton', false);
+      });
+    
+      async function loadExercise(exerciseName) {
+        const prosthetic = document.getElementById('prostheticInput').value.trim();
         if (!prosthetic) return alert('Please enter your prosthetic type.');
-
-        // reset UI
+    
+        const leg = document.getElementById('legInput').value.trim();
+        if (!leg) return alert('Please enter the leg side.');
+    
         resetUI();
-        setText('exerciseOutput', 'Thinking...');
-        setText('prostheticOutput', 'Verifying...');
+        setText('exerciseOutput', exerciseName);
+        setText('prostheticOutput', prosthetic);
         setText('purposeOutput', 'Analyzing...');
         setText('mistakesOutput', 'Reading...');
-        // setText('docOutput', 'Retrieving...');
-
+    
         try {
-          console.log({ exercises, prosthetic });
           const res = await fetch('/ask_llm', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ exercises, prosthetic }),
+            body: JSON.stringify({ exercises: exerciseName, prosthetic, leg })
           });
+    
           const data = await res.json();
-
           if (data.error) throw new Error(data.error);
-
-          setText('exerciseOutput', data.exercise ?? 'Unknown');
-          setText('prostheticOutput', data.prosthetic ?? 'Unknown');
+    
           setText('purposeOutput', data.purpose ?? 'Unknown');
           setText('mistakesOutput', data.mistake ?? 'Unknown');
-          // setText('docOutput', data.mistake ?? 'Unknown');
-
+    
           state.steps = data.steps ?? [];
           state.currentStep = 0;
           renderSteps();
-
+    
           toggle('startExerciseButton', false);
           toggle('uploadVideoButton', false);
-
-          // if (data.prosthetic === 'Yes' && state.steps.length) {
-            // toggle('startExerciseButton', false);
-            // toggle('uploadVideoButton', false);
-          // }
+    
         } catch (err) {
           console.error(err);
           setText('exerciseOutput', `Error: ${err.message}`);
           setText('prostheticOutput', '✖');
           setText('purposeOutput', '✖');
           setText('mistakesOutput', '✖');
-          // setText('docOutput', '✖');
           document.getElementById('exerciseStepsList').innerHTML = '<li>Failed to load steps.</li>';
         }
       }
-
+      
       /********************************************
        * STEP LIST RENDERING
        *******************************************/
@@ -384,62 +503,73 @@
         document.getElementById('errorMessage').style.display = 'none';
 
         if (!videoFile) {
-          feedbackContent.textContent = "Please enter a YouTube video URL or upload a video file.";
-          feedbackContent.style.borderColor = '#ef4444'; // Red border for error
+          showError("Please select a video file first.");
           return;
         }
 
         if (videoFile.size > MAX_FILE_SIZE_BYTES) {
-          throw new Error(`File is too large. Max allowed is ~${Math.round(MAX_FILE_SIZE_BYTES / (1024 * 1024))}MB.`);
+          showError(`File is too large. Max allowed is ~${Math.round(MAX_FILE_SIZE_BYTES / (1024 * 1024))}MB.`);
+          return;
         }
 
-        // Read the file as a Base64 string (for gemini flash) -> should I convert it before or after sending
-        const base64Data = await new Promise((resolve, reject) => {
+        // Show the video analysis container
+        const container = document.getElementById('video-analysis-container');
+        const analysisVideo = document.getElementById('analysis-video');
+        const analysisContent = document.getElementById('analysis-content');
+        
+        // Display the uploaded video
+        const videoURL = URL.createObjectURL(videoFile);
+        analysisVideo.src = videoURL;
+        
+        // Show container and reset feedback content
+        container.classList.add('show');
+        analysisContent.innerHTML = '<span class="analyzing-spinner">⟳</span> Analyzing video...';
+
+        try {
+          // Read the file as Base64
+          const base64Data = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result.split(',')[1]); // Get base64 part
             reader.onerror = error => reject(error);
             reader.readAsDataURL(videoFile);
-        });
+          });
 
-        //const formData = new FormData();
-        //formData.append('video', videoFile);
-        try {
           let requestData = {
             videoData: {
               base64: base64Data,
-            mimeType: videoFile.type,
-            fileName: videoFile.name
+              mimeType: videoFile.type,
+              fileName: videoFile.name
             }
-        };
+          };
 
-        console.log('Sending request data:', requestData);
+          console.log('Sending request data:', requestData);
 
-        // send to app.py
-        const response = await fetch('/analyze_video', {
-          method: "POST",
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(requestData)
-        });
+          // Send to app.py
+          const response = await fetch('/analyze_video', {
+            method: "POST",
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+          });
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
 
-        const data = await response.json();
+          const data = await response.json();
 
-        if (data.success) {
-          showFeedback(data.feedback);
-        } else {
-          showError(data.error || 'Analysis failed. Please try again.');
-        }
-      } 
+          if (data.success) {
+            // Display the feedback in the analysis container
+            analysisContent.innerHTML = `<div style="white-space: pre-wrap;">${data.feedback}</div>`;
+          } else {
+            analysisContent.innerHTML = `<div style="color: #dc3545;">❌ ${data.error || 'Analysis failed. Please try again.'}</div>`;
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          analysisContent.innerHTML = `<div style="color: #dc3545;">❌ Network error. Please check your connection and try again.</div>`;
+        } 
       
-      catch (error) {
-        console.error('Error:', error);
-        showError('Network error. Please check your connection and try again.');
-      }
 
       }
 
@@ -578,6 +708,105 @@
           state.processingFrames = false;
         }
       }
+
+      /********************************************
+       * SETUP RAG-LLM USING PROSTHETIC TYPE 
+       *******************************************/
+      document.getElementById('prostheticInput').addEventListener('change', async function () {
+        const prosthetic = this.value;
+
+        if (!prosthetic) return;
+
+        try {
+          const response = await fetch('/set_prosthetic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prosthetic })
+          });
+
+          const data = await response.json();
+
+          if (data.error) {
+            console.error("Error setting prosthetic:", data.error);
+            alert("Error loading prosthetic documents.");
+          } else {
+            console.log("RAG initialized for:", prosthetic);
+            alert(`Loaded documents for: ${prosthetic}`);
+          }
+        } catch (err) {
+          console.error("Failed to send prosthetic to backend:", err);
+          alert("Server error. Please try again.");
+        }
+      });
+
+      /********************************************
+       * UPLOAD FUNCTIONALITY (INLINE)
+       *******************************************/
+      document.getElementById('inlinePdfFileInput').addEventListener('change', function() {
+          const fileNameDisplay = document.getElementById('inlineFileNameDisplay');
+          if (this.files.length > 0) {
+              fileNameDisplay.textContent = this.files[0].name;
+              // Automatically upload when file is selected
+              uploadPdfFile(this.files[0]);
+          } else {
+              fileNameDisplay.textContent = 'No file chosen';
+          }
+      });
+
+      async function uploadPdfFile(file) {
+          const uploadStatus = document.getElementById('inlineUploadStatus');
+          uploadStatus.textContent = 'Uploading...';
+          uploadStatus.style.color = '#007bff';
+
+          const formData = new FormData();
+          formData.append('pdf_file', file);
+
+          try {
+              const response = await fetch('/upload_pdf', {
+                  method: 'POST',
+                  body: formData
+              });
+
+              const data = await response.json();
+
+              if (response.ok) {
+                  uploadStatus.textContent = data.message || 'File uploaded successfully!';
+                  uploadStatus.style.color = '#28a745'; // Green for success
+              } else {
+                  uploadStatus.textContent = data.error || 'Error uploading file.';
+                  uploadStatus.style.color = '#dc3545'; // Red for error
+              }
+          } catch (error) {
+              console.error('Upload error:', error);
+              uploadStatus.textContent = 'Network error or server unreachable.';
+              uploadStatus.style.color = '#dc3545'; // Red for error
+          }
+      }
+
+      document.getElementById('cancelUploadBtn').addEventListener('click', async function() {
+        // Clear UI elements
+         document.getElementById('inlinePdfFileInput').value = "";
+         document.getElementById('inlineFileNameDisplay').textContent = 'No file chosen';
+         document.getElementById('inlineUploadStatus').textContent = '';
+     
+         // Notify backend if file was uploaded
+         if (uploadedFileName) {
+             try {
+                 const res = await fetch('/remove_pdf', {
+                     method: 'POST',
+                     headers: {
+                         'Content-Type': 'application/json'
+                     },
+                     body: JSON.stringify({ filename: uploadedFileName })
+                 });
+                 const data = await res.json();
+                 alert(data.message || data.error);
+                 uploadedFileName = null;
+             } catch (error) {
+                 console.error('Error removing file:', error);
+             }
+         }
+       });      
 
       /********************************************
        * UTILS
