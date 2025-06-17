@@ -249,7 +249,7 @@ def ask_llm():
             f"For each exercise, also state the purpose of the exercise. Choose the best option from {exercise_purpose}"
             f"For each recommended exercise, also state commmon mistakes that individuals make "
             f"when performing the exercises, so the user is aware. "
-            f"IMPORTANT: If you could not find any related exercise from documents provided, please state that no alternative was found. "
+            f"IMPORTANT: If you could not find any related exercise from documents provided, please answer based on your general knowledge. "
             f"Additionally, provide the exercise steps clearly. "
             f"Format your response as follows:\n\n"
             f"Exercise: [Name of Exercise]\n"
@@ -263,6 +263,7 @@ def ask_llm():
             f"Exercise 2:"
             f"...\n\n"
             f"Recommended Exercises:"
+            f"IMPORTANT: If you could not find any related exercise from documents provided, answer based on your general knowledge."
         )
         print(prompt)
         
@@ -273,6 +274,7 @@ def ask_llm():
         '''
         response = qa_chain.invoke({"query": prompt})
         exercise_recommendation_full_text = response.get("result", "Could not find a suitable exercise.")
+        print(f'here: {response}')
 
         # extract using regex patterns
         exercise = re.search(r"Exercise:\s*(.*?)\s*Prosthetic", exercise_recommendation_full_text)
@@ -475,14 +477,20 @@ def analyze_video():
         base64_data = video_data.get('base64')
         mime_type = video_data.get('mimeType', 'video/mp4')
 
-        print('here')
-        print(llm_to_vlm)
+        # define prompt 
+        prompt = f"""
+        You are a physiotherapist reviewing a video of a person performing the exercise: "{llm_to_vlm['exercise']}".
 
-        # define prompt    
-        prompt = f""" You are an exercise coach. The person is performing this exercise: {llm_to_vlm['exercise']}.
-        Are they correctly performing these exercise steps: {llm_to_vlm['steps']}?
-        Provide corrections that the person should do to accurately execute the exercise steps.
-        Correct these common mistakes: {llm_to_vlm['mistake']}
+        Your tasks are:
+        1. Assess whether the person is correctly following these prescribed steps:
+        {llm_to_vlm['steps']}
+
+        2. Identify any mistakes or deviations in their form, especially these common ones:
+        {llm_to_vlm['mistake']}
+
+        3. Provide clear, specific feedback and corrections to help them perform the exercise accurately and safely.
+
+        Make your response actionable, supportive, and easy to follow, as if you were coaching them in person.
         """
         print(prompt)
 
