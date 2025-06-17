@@ -233,13 +233,24 @@ def upload_pdf():
         return jsonify({"error": f"Upload failed: {str(e)}"}), 500
 
 
-# Run RAG setup on server start
-# with app.app_context():
-    # setup_llm_and_rag() 
-'''
-    initialize LangChain RAG pipeline:
-    loads pDF, embeds docs, initialize LLMs, set up qa_chain for user queries
-'''
+@app.route('/remove_pdf', methods=['POST'])
+def remove_pdf():
+    data = request.get_json()
+    filename = data.get('filename')
+
+    if not filename:
+        return jsonify({"error": "Filename not provided"}), 400
+
+    file_path = os.path.join("uploads", filename)
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+            return jsonify({"message": f"PDF '{filename}' removed successfully."}), 200
+        except Exception as e:
+            return jsonify({"error": f"Error deleting file: {str(e)}"}), 500
+    else:
+        return jsonify({"error": "File does not exist"}), 404
+
 
 # display main webpage (html file from templates folder)
 @app.route('/')
@@ -302,8 +313,12 @@ def ask_llm():
             f"You are a virtual rehabilitation assistant "
             f"to help guide users with lower limb prosthetics through their rehabilitation exercises. "
             f"Given the following exercises: {user_exercises}, provide a step-by-step description of the exercises "
-            f"based on the user's type and location of prosthetic: {user_details}. Use the provided documents to find exercises descriptions. "
+            f"based on the user's type and location of prosthetic: {user_details}." 
+            f"Use the provided documents to find exercises descriptions. "
             f"The description must be tailored towards the user's type of prosthetic."
+            f"Only provide one set of steps for each exercise."
+            f"If multiple descriptions of the same exercise exists, combine the information from each description "
+            f"in order to provide the most detailed set of exercise steps as possible"
             f"If you could not find the exercise provided specific to the user's prosthetic, suggest an alternative based on the documents provided. "
             f"For each exercise, also state the types of prosthetic limb that this exercise is used for. "
             f"For each exercise, also state the purpose of the exercise. Choose the best option from {exercise_purpose}"

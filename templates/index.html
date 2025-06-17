@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Health Assistant</title>
+    <title>VEHAB</title>
     <style>
       /* -----------  BASIC LAYOUT  ----------- */
       *,
@@ -15,7 +15,7 @@
         margin: 0;
         padding: 2rem;
         font-family: Arial, sans-serif;
-        background: #fafafa;
+        background: #ffffff;
         color: #222;
       }
       h1 {
@@ -32,7 +32,7 @@
         padding: 0.6rem 1.2rem;
         border: 1px solid #ccc;
         border-bottom: none;
-        background: #e9e9e9;
+        background: #ffae68;
         border-radius: 0.5rem 0.5rem 0 0;
         cursor: pointer;
         transition: background 0.2s;
@@ -42,7 +42,7 @@
         background: #dcdcdc;
       }
       .tab-button.active {
-        background: #fff;
+        background: #ff661f;
         font-weight: 600;
       }
       .tab-content {
@@ -70,14 +70,14 @@
         padding: 0.6rem 1rem;
         border: none;
         border-radius: 0.25rem;
-        background: #007bff;
+        background: #3620ff;
         color: #fff;
         font-size: 0.9rem;
         cursor: pointer;
         transition: background 0.2s;
       }
       button:hover {
-        background: #0269d6;
+        background: #214aff;
       }
       button.secondary {
         background: #6c757d;
@@ -105,14 +105,14 @@
         padding: 0.6rem 1rem;
         border: none;
         border-radius: 0.25rem;
-        background: #007bff;
+        background: #3620ff;
         color: #fff;
         font-size: 0.9rem;
         cursor: pointer;
         transition: background 0.2s;
       }
       .file-upload-inline-container .custom-file-upload:hover {
-        background: #0269d6;
+        background: #214aff;
       }
       .file-upload-inline-container .file-name {
           margin-left: 0.5rem;
@@ -242,12 +242,12 @@
     </style>
   </head>
   <body>
-    <h1>Your AI Rehab Assistant</h1>
+    <h1>VEHAB: Your AI Prosthetic Rehab Assistant</h1>
 
     <!--  TAB CONTROLS  -->
     <div class="tabs">
       <button class="tab-button active" data-target="exerciseTab">Exercise</button>
-      <button class="tab-button" data-target="anotherTab">Another Tab</button>
+      <button class="tab-button" data-target="recommendTab">Get Recommendations</button>
     </div>
 
     <!--  EXERCISE TAB  -->
@@ -269,13 +269,15 @@
       <textarea id="exercisesInput" placeholder="e.g., Hamstring Stretch, Hip Extension on Side, Side Stepping."></textarea>
       <br />
       <div class="button-row">
+        <button id="askButton">Get Recommendation</button>
+        <br />
         <div class="file-upload-inline-container">
             <input type="file" name="pdf_file" id="inlinePdfFileInput" accept=".pdf">
             <label for="inlinePdfFileInput" class="custom-file-upload">Upload PDF</label>
             <span id="inlineFileNameDisplay" class="file-name">No file chosen</span>
         </div>
 
-        <button id="askButton">Get Recommendation</button>
+        <button id="cancelUploadBtn">Cancel Upload</button>
       </div>
       <p id="inlineUploadStatus" style="margin-top: 0.5rem; font-weight: bold;"></p>
 
@@ -341,9 +343,9 @@
 
 
     <!--  SECOND TAB  -->
-    <section id="anotherTab" class="tab-content hidden">
-      <h2>Another Tab</h2>
-      <p>Put your secondary content here.</p>
+    <section id="recommendTab" class="tab-content hidden">
+      <h2>Get Recommendations</h2>
+      <p>Get basic exercises based on recovery timeline, skill, and prosthetic type</p>
     </section>
 
     <!--  SCRIPT AREA  -->
@@ -770,6 +772,31 @@
               uploadStatus.style.color = '#dc3545'; // Red for error
           }
       }
+
+      document.getElementById('cancelUploadBtn').addEventListener('click', async function() {
+       // Clear UI elements
+        document.getElementById('inlinePdfFileInput').value = "";
+        document.getElementById('inlineFileNameDisplay').textContent = 'No file chosen';
+        document.getElementById('inlineUploadStatus').textContent = '';
+    
+        // Notify backend if file was uploaded
+        if (uploadedFileName) {
+            try {
+                const res = await fetch('/remove_pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ filename: uploadedFileName })
+                });
+                const data = await res.json();
+                alert(data.message || data.error);
+                uploadedFileName = null;
+            } catch (error) {
+                console.error('Error removing file:', error);
+            }
+        }
+      });
 
       /********************************************
        * UTILS
