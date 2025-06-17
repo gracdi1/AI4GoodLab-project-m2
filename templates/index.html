@@ -256,10 +256,13 @@
       <p>Describe your prosthetic/amputation type to get tailored exercise recommendations:</p>
       <select id="prostheticInput">
         <option value="" disabled selected>Select prosthetic/amputation type</option>
-        <option value="transtibial_right">Transtibial (below knee) - Right leg</option>
-        <option value="transtibial_left">Transtibial (below knee) - Left leg</option>
-        <option value="transfemoral_right">Transfemoral (above knee) - Right leg</option>
-        <option value="transfemoral_left">Transfemoral (above knee) - Left leg</option>
+        <option value="transtibial">Transtibial (below knee)</option>
+        <option value="transfemoral">Transfemoral (above knee)</option>
+      </select>
+      <select id="legInput">
+        <option value="" disabled selected>Select right or left leg</option>
+        <option value="right">Right leg</option>
+        <option value="left">Left leg</option>
       </select>
       <br />
       <p>List the exercises reccomended to you by your physiotherapist:</p>
@@ -385,6 +388,9 @@
         const prosthetic= document.getElementById('prostheticInput').value.trim();
         if (!prosthetic) return alert('Please enter your prosthetic type.');
 
+        const leg= document.getElementById('legInput').value.trim();
+        if (!leg) return alert('Please enter the leg side.');
+
         // reset UI
         resetUI();
         setText('exerciseOutput', 'Thinking...');
@@ -394,11 +400,11 @@
         // setText('docOutput', 'Retrieving...');
 
         try {
-          console.log({ exercises, prosthetic });
+          console.log({ exercises, prosthetic, leg });
           const res = await fetch('/ask_llm', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ exercises, prosthetic }),
+            body: JSON.stringify({ exercises, prosthetic, leg }),
           });
           const data = await res.json();
 
@@ -690,6 +696,36 @@
           state.processingFrames = false;
         }
       }
+
+      /********************************************
+       * SETUP RAG-LLM USING PROSTHETIC TYPE 
+       *******************************************/
+      document.getElementById('prostheticInput').addEventListener('change', async function () {
+        const prosthetic = this.value;
+
+        if (!prosthetic) return;
+
+        try {
+          const response = await fetch('/set_prosthetic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prosthetic })
+          });
+
+          const data = await response.json();
+
+          if (data.error) {
+            console.error("Error setting prosthetic:", data.error);
+            alert("Error loading prosthetic documents.");
+          } else {
+            console.log("RAG initialized for:", prosthetic);
+            alert(`Loaded documents for: ${prosthetic}`);
+          }
+        } catch (err) {
+          console.error("Failed to send prosthetic to backend:", err);
+          alert("Server error. Please try again.");
+        }
+      });
 
       /********************************************
        * UPLOAD FUNCTIONALITY (INLINE)

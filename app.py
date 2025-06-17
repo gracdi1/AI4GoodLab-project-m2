@@ -94,6 +94,7 @@ current_exercise_steps = []
 current_exercise_index = 0
 vlm_model = None # To be initialized with gemini-pro-vision
 llm_to_vlm = None
+global_mode = None
 '''
     initialize variables that will be used for the step-by-step instructions feature
 '''
@@ -104,9 +105,9 @@ llm = None # store LLM (text-only Gemini model)
 current_retriever = None
 # qa_chain = None # RAG chain: combines vectorstore + LLM (q-a pipeline)
 
-def setup_llm_and_rag(pdf_file_path=None, mode='default_doc'):
-    global vectorstore, llm, vlm_model # qa_chain
-
+def setup_llm_and_rag(pdf_file_path=None, mode='default_doc', user_prosthetic=None):
+    global vectorstore, llm, vlm_model, global_mode # qa_chain
+    
     if mode == 'default_doc':
         # Initialize Google Gemini LLM (for text-based recommendation)
         try:
@@ -122,11 +123,29 @@ def setup_llm_and_rag(pdf_file_path=None, mode='default_doc'):
             print("Google Gemini VLM initialized successfully.")
         except Exception as e:
             print(f"Error initializing VLM: {e}")
+            return False
+        
+    # ensure prosthetic is inputed
+    if not user_prosthetic and mode == 'default_doc':
+        print("Error: No prosthetic type provided for default mode.")
+        return False
 
-    # 1. Load your PDF files
+    # Load your PDF files
     documents = []
-    if mode == 'default_doc': # if user lists exercises
-        pdf_folder = r"./data"
+    
+    if mode == 'uploaded_pdf': # if user uploads a pdf
+        global_mode = mode
+        if pdf_file_path and os.path.exists(pdf_file_path): # use pdf instead
+            print(f"Loading uploaded PDF: {pdf_file_path}")
+            loader = PyPDFLoader(pdf_file_path)
+            documents = loader.load()
+        else: # error
+            print("No valid PDF path provided.")
+            return False
+
+    elif mode == 'default_doc': # if user lists exercises but no pdf
+        global_mode = mode
+        pdf_folder = os.path.join("data", user_prosthetic)
         print("Using pdf_folder path:", pdf_folder)
         pdf_paths = [os.path.join(pdf_folder, f) for f in os.listdir(pdf_folder) if f.endswith(".pdf")]
         for pdf_path in pdf_paths:
@@ -134,24 +153,30 @@ def setup_llm_and_rag(pdf_file_path=None, mode='default_doc'):
                 try:
                     loader = PyPDFLoader(pdf_path)
                     documents.extend(loader.load())
+                    print(f"Path: \n {pdf_path}")
+                    print(len(documents))
                 except Exception as e:
                     print(f"Failed to load {pdf_path}: {e}")
             else:
                 print(f"Warning: PDF file not found at {pdf_path}")
-    elif pdf_file_path and os.path.exists(pdf_file_path): # use pdf instead
-        print(f"Loading uploaded PDF: {pdf_file_path}")
-        loader = PyPDFLoader(pdf_file_path)
-        documents = loader.load()
-    else: # error
-        print("No valid PDF path provided.")
+
+    else:
+        print("Unknown mode or missing PDF.")
         return False
+    
     ''' 
         loads booklet as a list of pages 
         each page is a separate Document obj
     '''
 
+    # tag metadata for prosthetic type and mode
     for doc in documents:
-        doc.metadata["category"] = mode
+        if global_mode == 'uploaded_pdf':
+            doc.metadata["category"] = mode
+        elif global_mode == 'default_doc':
+            doc.metadata["category"] = mode + user_prosthetic # add the specific prosthetic category for default
+    
+    # split and embed documents based on mode
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     texts = []
     texts = text_splitter.split_documents(documents)
@@ -161,8 +186,24 @@ def setup_llm_and_rag(pdf_file_path=None, mode='default_doc'):
         print(f"Stored {len(texts)} chunks in mode '{mode}'")
         return True
     except Exception as e:
-        print(f"Error creating QA chain: {e}")
+        print(f"Error creating vectorstore: {e}")
         return False
+    
+# set prosthetic for default mode prior to initializing
+@app.route('/set_prosthetic', methods=['POST'])
+def set_prosthetic():
+    data = request.get_json()
+    user_prosthetic = data.get('prosthetic')
+
+    if not user_prosthetic:
+        return jsonify({"error": "Prosthetic type not provided"}), 400
+
+    success = setup_llm_and_rag(mode='default_doc', user_prosthetic=user_prosthetic)
+
+    if not success:
+        return jsonify({"error": "Failed to initialize LLM and vector store."}), 500
+
+    return jsonify({"message": f"Setup completed for prosthetic: {user_prosthetic}"}), 200
 
 
 # upload PDF endpoint and run RAG setup (loads pDF, embeds docs, initialize LLMs)
@@ -218,7 +259,7 @@ def index():
 '''
 @app.route('/ask_llm', methods=['POST'])
 def ask_llm():
-    global current_exercise_steps, current_exercise_index # Use globals
+    global current_exercise_steps, current_exercise_index, global_mode # Use globals
 
     # 1. get symptoms input -> change to get exercises/type of prosthetic
     ''' 
@@ -227,9 +268,15 @@ def ask_llm():
     '''
     print(request.json)
     print("*******************")
-    user_details = request.json.get('prosthetic')
-    if not user_details:
+    
+    user_prosthetic = request.json.get('prosthetic')
+    if not user_prosthetic:
         return jsonify({"error": "No details provided"}), 400
+    user_leg = request.json.get('leg')
+    if not user_leg:
+        return jsonify({"error": "No details provided"}), 400
+    user_details = user_prosthetic + user_leg
+    
     user_exercises = request.json.get('exercises')
     exercise_purpose = ['Strength', 'Mobility', 'Balance', 'Agility'] # needed?
     if not user_exercises:
@@ -255,7 +302,7 @@ def ask_llm():
             f"You are a virtual rehabilitation assistant "
             f"to help guide users with lower limb prosthetics through their rehabilitation exercises. "
             f"Given the following exercises: {user_exercises}, provide a step-by-step description of the exercises "
-            f"based on the user's type of prosthetic: {user_details}. Use the provided documents to find exercises descriptions. "
+            f"based on the user's type and location of prosthetic: {user_details}. Use the provided documents to find exercises descriptions. "
             f"The description must be tailored towards the user's type of prosthetic."
             f"If you could not find the exercise provided specific to the user's prosthetic, suggest an alternative based on the documents provided. "
             f"For each exercise, also state the types of prosthetic limb that this exercise is used for. "
@@ -284,7 +331,18 @@ def ask_llm():
             RAG process: search the vectorstore + pass results to LLM
             returns a dictionary with "result" as key based on PDFs
         '''
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+        print('global mode: ',global_mode)
+        if global_mode == 'uploaded_pdf': # upload pdf mode
+            retriever = vectorstore.as_retriever(search_kwargs={
+                "filter": {"category": global_mode}
+                }
+            )
+        elif global_mode == 'default_doc': # if default mode then have the category = mode + prosthetic
+            retriever = vectorstore.as_retriever(search_kwargs={
+                "filter": {"category": global_mode + user_prosthetic}
+                }
+            )
+        
         qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
@@ -293,6 +351,7 @@ def ask_llm():
         
         response = qa_chain.invoke({"query": prompt})
         exercise_recommendation_full_text = response.get("result", "Could not find a suitable exercise.")
+        print(exercise_recommendation_full_text)
 
         # extract using regex patterns
         exercise = re.search(r"Exercise:\s*(.*?)\s*Prosthetic", exercise_recommendation_full_text)
@@ -583,9 +642,4 @@ def analyze_video():
         }), 500
 
 if __name__ == '__main__':
-    if os.path.exists("./data"):
-        print("Initializing with default PDFs from /data...")
-        setup_llm_and_rag(mode='default_doc')
-    else:
-        print("No default PDF folder found. Upload required.")
     app.run(debug=True)
