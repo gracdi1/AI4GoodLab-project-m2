@@ -206,7 +206,10 @@ def upload_pdf():
         success = setup_llm_and_rag(pdf_file_path=save_path, mode='uploaded_pdf')
 
         if success:
-            return jsonify({"message": f"PDF '{file.filename}' uploaded and RAG system initialized."}), 200
+            return jsonify({
+                "message": f"PDF '{file.filename}' uploaded and RAG system initialized.",
+                "filename": file.filename
+            }), 200
         else:
             return jsonify({"error": "Failed to initialize RAG system with uploaded PDF"}), 500
 
@@ -216,8 +219,12 @@ def upload_pdf():
 
 @app.route('/remove_pdf', methods=['POST'])
 def remove_pdf():
+    global global_mode
     data = request.get_json()
     filename = data.get('filename')
+    user_prosthetic = data.get('user_prosthetic')
+
+    print("Received request to remove PDF")
 
     if not filename:
         return jsonify({"error": "Filename not provided"}), 400
@@ -226,7 +233,14 @@ def remove_pdf():
     if os.path.exists(file_path):
         try:
             os.remove(file_path)
-            return jsonify({"message": f"PDF '{filename}' removed successfully."}), 200
+            print(f"PDF '{filename}' removed successfully")
+
+            # Reset to mode = default_doc
+            success = setup_llm_and_rag(mode='default_doc')
+            if not success:
+                return jsonify({"error": f"Uploaded File '{filename}' is removed."}), 500
+            return jsonify({"message": f"PDF '{filename}' removed and reset to use database (default_mode)."})
+        
         except Exception as e:
             return jsonify({"error": f"Error deleting file: {str(e)}"}), 500
     else:
@@ -394,6 +408,7 @@ def ask_llm():
             "purpose": purpose.group(1) if purpose else "",
             "mistake": mistakes.group(1) if mistakes else "",
             "steps": current_exercise_steps,
+            "user_info": user_prosthetic,
             "sources": source_names
         }
 
@@ -548,17 +563,49 @@ def analyze_video():
         base64_data = video_data.get('base64')
         mime_type = video_data.get('mimeType', 'video/mp4')
 
+        '''llm_to_vlm['steps'] = f"""Steps:
+                    1. Lie on your operative side.
+                    2. Lift your non-residual limb straight up, keeping your residual limb straight in line with your hip.
+                    3. Relax.
+                    4. Repeat."""
+                    '''
+
         # define prompt    
         prompt = f""" 
         You are a physiotherapist reviewing a video of a person performing the exercise: "{llm_to_vlm['exercise']}".
+        
         Your tasks are:
-        1. Assess whether the person is correctly following these prescribed steps:
-        {llm_to_vlm['steps']}
-        2. Identify any mistakes or deviations in their form, especially these common ones:
-        {llm_to_vlm['mistake']}. Make sure to identify incorrect form, posture, and positioning of the body.  
-        3. Provide clear, specific feedback and corrections to help them perform the exercise accurately and safely.
-        Make your response actionable, supportive, and easy to follow, as if you were coaching them in person.
+            1. Assess whether the person is correctly following these prescribed steps:
+            {llm_to_vlm['steps']}. If any steps are performed incorrectly, please state which steps
+            and provide corrections.
+            2. Identify if the person makes any of these mistakes: {llm_to_vlm['mistake']}. 
+            Make sure to identify incorrect form, posture, and positioning of the body.
+            If any mistakes are made, please state which mistakes and provide corrections.
+        
+        Please highlight if there are any safety concerns or hazards
+        
+        IMPORTANT: Ensure the feedback is specific, concise, and supportive, as if you were
+        coaching the user in person. 
+
+        Please format your response like this:
+
+        Does the user have a amputation? [Yes/No]
+        What is the amputation? 
+        What is the user doing?
+
+        Steps done correctly: [Yes/No]
+            Corrections: [N/A if not]
+        Correct form and posture: [Yes/No]
+            Corrections: [N/A if not]
+
+
         """
+
+        # with a limb amputation
+        # IMPORTANT: This person has this amputation: {llm_to_vlm['user_info']} The person may or may not be wearing a prosthetic in this video. Make sure 
+        # your response is cognizant of this.
+
+
         print(prompt)
 
         # put into parts for gemini
