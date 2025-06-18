@@ -293,6 +293,29 @@
           <ul id="exerciseStepsList">
             <li>Steps will appear here.</li>
           </ul>
+
+          <div class="speech-controls" style="margin-top: 1rem;">
+            <label for="voiceSelect"><strong>Choose Voice:</strong></label>
+            <select id="voiceSelect"></select>
+          
+            <div style="margin-top: 1rem;">
+              <label for="rateSlider">Speed (Rate): <span id="rateValue">1</span></label>
+              <input type="range" id="rateSlider" min="0.5" max="2" value="1" step="0.1" />
+            </div>
+          
+            <div style="margin-top: 0.5rem;">
+              <label for="pitchSlider">Pitch: <span id="pitchValue">1</span></label>
+              <input type="range" id="pitchSlider" min="0.5" max="2" value="1" step="0.1" />
+            </div>
+          
+            <div style="margin-top: 1rem;">
+              <button id="readStepsButton" class="secondary">Read Steps</button>
+              <button id="pauseButton" class="secondary">⏸ Pause</button>
+              <button id="resumeButton" class="secondary">▶ Resume</button>
+              <button id="stopButton" class="secondary">⏹ Stop</button>
+            </div>
+          </div>         
+
           <div class="button-group">
             <button id="startExerciseButton" class="hidden">Start Exercise with VLM</button>
             <button id="uploadVideoButton" class="hidden">Upload Video</button>
@@ -473,7 +496,101 @@
         setText('currentStepDisplay', state.steps[state.currentStep] ?? 'N/A');
       }
 
-       /** UPLOAD VIDEO **/
+      /********************************************
+       * READ STEPS
+       *******************************************/
+      let voices = [];
+      let utterance;
+      let isSpeaking = false;
+    
+      function loadVoices() {
+        voices = speechSynthesis.getVoices()
+          .filter(voice => voice.lang.toLowerCase().startsWith('en'));
+      
+        const voiceSelect = document.getElementById('voiceSelect');
+        voiceSelect.innerHTML = '';
+      
+        voices.forEach((voice, i) => {
+          const option = document.createElement('option');
+          option.value = i;
+          option.textContent = `${voice.name} (${voice.lang})`;
+          voiceSelect.appendChild(option);
+        });
+      }      
+    
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    
+      function readSteps() {
+        const stepsList = document.getElementById('exerciseStepsList');
+        const voiceSelect = document.getElementById('voiceSelect');
+        const rate = parseFloat(document.getElementById('rateSlider').value);
+        const pitch = parseFloat(document.getElementById('pitchSlider').value);
+    
+        if (!stepsList || !voiceSelect) return;
+    
+        const steps = Array.from(stepsList.querySelectorAll('li'))
+          .map(li => li.textContent)
+          .join('. ');
+    
+        if (!steps.trim()) {
+          alert("No steps available to read.");
+          return;
+        }
+    
+        if (speechSynthesis.speaking) {
+          speechSynthesis.cancel(); // cancel ongoing speech
+        }
+    
+        utterance = new SpeechSynthesisUtterance(steps);
+        const selectedVoice = voices[voiceSelect.value];
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+        }
+    
+        utterance.lang = 'en-US';
+        utterance.rate = rate;
+        utterance.pitch = pitch;
+    
+        speechSynthesis.speak(utterance);
+        isSpeaking = true;
+      }
+    
+      function pauseSpeech() {
+        if (speechSynthesis.speaking && !speechSynthesis.paused) {
+          speechSynthesis.pause();
+        }
+      }
+    
+      function resumeSpeech() {
+        if (speechSynthesis.paused) {
+          speechSynthesis.resume();
+        }
+      }
+    
+      function stopSpeech() {
+        speechSynthesis.cancel();
+        isSpeaking = false;
+      }
+    
+      // Update slider values on screen
+      document.getElementById('rateSlider').addEventListener('input', () => {
+        document.getElementById('rateValue').textContent = document.getElementById('rateSlider').value;
+      });
+    
+      document.getElementById('pitchSlider').addEventListener('input', () => {
+        document.getElementById('pitchValue').textContent = document.getElementById('pitchSlider').value;
+      });
+    
+      // Event listeners
+      document.getElementById('readStepsButton').addEventListener('click', readSteps);
+      document.getElementById('pauseButton').addEventListener('click', pauseSpeech);
+      document.getElementById('resumeButton').addEventListener('click', resumeSpeech);
+      document.getElementById('stopButton').addEventListener('click', stopSpeech);
+
+       
+      /******************************
+       *       UPLOAD VIDEO 
+       ****************************/
       document.getElementById('uploadVideoButton').addEventListener('click', () => {
         document.getElementById('videoFileInput').click();
       });

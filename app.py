@@ -293,7 +293,7 @@ def ask_llm():
             f"1. Only provide ONE VERSION of steps for each exercise.\n"
             f"2. If multiple descriptions exist, merge them into one clean and non-redundant step-by-step list,"
             f"   avoiding duplicated or alternative step formats. Do NOT list both versions."
-            f"3. ONLY IF the exercise is NOT found for this prosthetic type, suggest the closest alternative from the documents.\n"
+            f"3. ONLY IF the exercise(s) inputted by the user are NOT found, suggest the closest alternative from the documents.\n"
             f"4. For EACH exercise, include:\n"
             f"   - Prosthetic limb type(s) that use this exercise\n"
             f"   - The purpose (choose from {exercise_purpose})\n"
@@ -544,14 +544,16 @@ def analyze_video():
         base64_data = video_data.get('base64')
         mime_type = video_data.get('mimeType', 'video/mp4')
 
-        print('here')
-        print(llm_to_vlm)
-
         # define prompt    
-        prompt = f""" You are an exercise coach. The person is performing this exercise: {llm_to_vlm['exercise']}.
-        Are they correctly performing these exercise steps: {llm_to_vlm['steps']}?
-        Provide corrections that the person should do to accurately execute the exercise steps.
-        Correct these common mistakes: {llm_to_vlm['mistake']}
+        prompt = f""" 
+        You are a physiotherapist reviewing a video of a person performing the exercise: "{llm_to_vlm['exercise']}".
+        Your tasks are:
+        1. Assess whether the person is correctly following these prescribed steps:
+        {llm_to_vlm['steps']}
+        2. Identify any mistakes or deviations in their form, especially these common ones:
+        {llm_to_vlm['mistake']}. Make sure to identify incorrect form, posture, and positioning of the body.  
+        3. Provide clear, specific feedback and corrections to help them perform the exercise accurately and safely.
+        Make your response actionable, supportive, and easy to follow, as if you were coaching them in person.
         """
         print(prompt)
 
