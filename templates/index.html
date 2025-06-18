@@ -265,7 +265,7 @@
         <option value="left">Left leg</option>
       </select>
       <br />
-      <p>List the exercises reccomended to you by your physiotherapist:</p>
+      <p>List the exercises recommended to you by your physiotherapist:</p>
       <textarea id="exercisesInput" placeholder="e.g., Hamstring Stretch, Hip Extension on Side, Side Stepping."></textarea>
       <br />
       <div class="button-row">
@@ -286,13 +286,35 @@
         <p><strong>Prosthetic limb type(s):</strong> <span id="prostheticOutput">N/A</span></p>
         <p><strong>Exercise Purpose:</strong> <span id="purposeOutput">N/A</span></p>
         <p><strong>Common Mistakes:</strong> <span id="mistakesOutput">N/A</span></p>
-        <!-- <p><strong>Document(s) used:</strong> <span id="docOutput">N/A</span></p> -->
 
         <div class="exercise-steps-container">
           <h4>Exercise Steps:</h4>
           <ul id="exerciseStepsList">
             <li>Steps will appear here.</li>
           </ul>
+
+          <div class="speech-controls" style="margin-top: 1rem;">
+            <label for="voiceSelect"><strong>Choose Voice:</strong></label>
+            <select id="voiceSelect"></select>
+          
+            <div style="margin-top: 1rem;">
+              <label for="rateSlider">Speed (Rate): <span id="rateValue">1</span></label>
+              <input type="range" id="rateSlider" min="0.5" max="2" value="1" step="0.1" />
+            </div>
+          
+            <div style="margin-top: 0.5rem;">
+              <label for="pitchSlider">Pitch: <span id="pitchValue">1</span></label>
+              <input type="range" id="pitchSlider" min="0.5" max="2" value="1" step="0.1" />
+            </div>
+          
+            <div style="margin-top: 1rem;">
+              <button id="readStepsButton" class="secondary">Read Steps</button>
+              <button id="pauseButton" class="secondary">⏸ Pause</button>
+              <button id="resumeButton" class="secondary">▶ Resume</button>
+              <button id="stopButton" class="secondary">⏹ Stop</button>
+            </div>
+          </div>         
+
           <div class="button-group">
             <button id="startExerciseButton" class="hidden">Start Exercise with VLM</button>
             <button id="uploadVideoButton" class="hidden">Upload Video</button>
@@ -381,44 +403,58 @@
       }
 
       /********************************************
-       * RECOMMENDATION FLOW
-       *******************************************/
-      document.getElementById('askButton').addEventListener('click', fetchRecommendation);
-
-      async function fetchRecommendation() {
-        const exercises = document.getElementById('exercisesInput').value.trim();
-        if (!exercises) return alert('Please enter your exercises.');
-
-        const prosthetic= document.getElementById('prostheticInput').value.trim();
+      * MULTI-EXERCISE SUPPORT
+      *******************************************/
+      document.getElementById('nextExerciseButton').addEventListener('click', () => {
+        if (currentExerciseIndex + 1 < exerciseQueue.length) {
+          currentExerciseIndex++;
+          loadExercise(exerciseQueue[currentExerciseIndex]);
+        } else {
+          alert('All exercises completed!');
+          toggle('nextExerciseButton', true);
+        }
+      });
+    
+      document.getElementById('askButton').addEventListener('click', async () => {
+        const exercisesRaw = document.getElementById('exercisesInput').value.trim();
+        if (!exercisesRaw) return alert('Please enter your exercises.');
+    
+        exerciseQueue = exercisesRaw.split(',').map(e => e.trim()).filter(Boolean);
+        if (!exerciseQueue.length) return alert('Please enter at least one valid exercise.');
+    
+        currentExerciseIndex = 0;
+        loadExercise(exerciseQueue[currentExerciseIndex]);
+        toggle('nextExerciseButton', false);
+      });
+    
+      async function loadExercise(exerciseName) {
+        const prosthetic = document.getElementById('prostheticInput').value.trim();
         if (!prosthetic) return alert('Please enter your prosthetic type.');
-
-        const leg= document.getElementById('legInput').value.trim();
+    
+        const leg = document.getElementById('legInput').value.trim();
         if (!leg) return alert('Please enter the leg side.');
 
         // reset UI
         resetUI();
-        setText('exerciseOutput', 'Thinking...');
-        setText('prostheticOutput', 'Verifying...');
+        setText('exerciseOutput', 'Thinking...'); // change for demo day
+        setText('prostheticOutput', 'Verifying...'); // change for demo day
         setText('purposeOutput', 'Analyzing...');
         setText('mistakesOutput', 'Reading...');
-        // setText('docOutput', 'Retrieving...');
 
         try {
-          console.log({ exercises, prosthetic, leg });
           const res = await fetch('/ask_llm', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ exercises, prosthetic, leg }),
+            body: JSON.stringify({ exercises: exerciseName, prosthetic, leg })
           });
+    
           const data = await res.json();
-
           if (data.error) throw new Error(data.error);
 
           setText('exerciseOutput', data.exercise ?? 'Unknown');
           setText('prostheticOutput', data.prosthetic ?? 'Unknown');
           setText('purposeOutput', data.purpose ?? 'Unknown');
           setText('mistakesOutput', data.mistake ?? 'Unknown');
-          // setText('docOutput', data.mistake ?? 'Unknown');
 
           state.steps = data.steps ?? [];
           state.currentStep = 0;
@@ -427,17 +463,13 @@
           toggle('startExerciseButton', false);
           toggle('uploadVideoButton', false);
 
-          // if (data.prosthetic === 'Yes' && state.steps.length) {
-            // toggle('startExerciseButton', false);
-            // toggle('uploadVideoButton', false);
-          // }
         } catch (err) {
           console.error(err);
           setText('exerciseOutput', `Error: ${err.message}`);
           setText('prostheticOutput', '✖');
           setText('purposeOutput', '✖');
           setText('mistakesOutput', '✖');
-          // setText('docOutput', '✖');
+
           document.getElementById('exerciseStepsList').innerHTML = '<li>Failed to load steps.</li>';
         }
       }
@@ -465,7 +497,101 @@
         setText('currentStepDisplay', state.steps[state.currentStep] ?? 'N/A');
       }
 
-       /** UPLOAD VIDEO **/
+      /********************************************
+       * READ STEPS
+       *******************************************/
+      let voices = [];
+      let utterance;
+      let isSpeaking = false;
+    
+      function loadVoices() {
+        voices = speechSynthesis.getVoices()
+          .filter(voice => voice.lang.toLowerCase().startsWith('en'));
+      
+        const voiceSelect = document.getElementById('voiceSelect');
+        voiceSelect.innerHTML = '';
+      
+        voices.forEach((voice, i) => {
+          const option = document.createElement('option');
+          option.value = i;
+          option.textContent = `${voice.name} (${voice.lang})`;
+          voiceSelect.appendChild(option);
+        });
+      }      
+    
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    
+      function readSteps() {
+        const stepsList = document.getElementById('exerciseStepsList');
+        const voiceSelect = document.getElementById('voiceSelect');
+        const rate = parseFloat(document.getElementById('rateSlider').value);
+        const pitch = parseFloat(document.getElementById('pitchSlider').value);
+    
+        if (!stepsList || !voiceSelect) return;
+    
+        const steps = Array.from(stepsList.querySelectorAll('li'))
+          .map(li => li.textContent)
+          .join('. ');
+    
+        if (!steps.trim()) {
+          alert("No steps available to read.");
+          return;
+        }
+    
+        if (speechSynthesis.speaking) {
+          speechSynthesis.cancel(); // cancel ongoing speech
+        }
+    
+        utterance = new SpeechSynthesisUtterance(steps);
+        const selectedVoice = voices[voiceSelect.value];
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+        }
+    
+        utterance.lang = 'en-US';
+        utterance.rate = rate;
+        utterance.pitch = pitch;
+    
+        speechSynthesis.speak(utterance);
+        isSpeaking = true;
+      }
+    
+      function pauseSpeech() {
+        if (speechSynthesis.speaking && !speechSynthesis.paused) {
+          speechSynthesis.pause();
+        }
+      }
+    
+      function resumeSpeech() {
+        if (speechSynthesis.paused) {
+          speechSynthesis.resume();
+        }
+      }
+    
+      function stopSpeech() {
+        speechSynthesis.cancel();
+        isSpeaking = false;
+      }
+    
+      // Update slider values on screen
+      document.getElementById('rateSlider').addEventListener('input', () => {
+        document.getElementById('rateValue').textContent = document.getElementById('rateSlider').value;
+      });
+    
+      document.getElementById('pitchSlider').addEventListener('input', () => {
+        document.getElementById('pitchValue').textContent = document.getElementById('pitchSlider').value;
+      });
+    
+      // Event listeners
+      document.getElementById('readStepsButton').addEventListener('click', readSteps);
+      document.getElementById('pauseButton').addEventListener('click', pauseSpeech);
+      document.getElementById('resumeButton').addEventListener('click', resumeSpeech);
+      document.getElementById('stopButton').addEventListener('click', stopSpeech);
+
+       
+      /******************************
+       *       UPLOAD VIDEO 
+       ****************************/
       document.getElementById('uploadVideoButton').addEventListener('click', () => {
         document.getElementById('videoFileInput').click();
       });
@@ -701,35 +827,6 @@
         }
       }
 
-      /********************************************
-       * SETUP RAG-LLM USING PROSTHETIC TYPE 
-       *******************************************/
-      document.getElementById('prostheticInput').addEventListener('change', async function () {
-        const prosthetic = this.value;
-
-        if (!prosthetic) return;
-
-        try {
-          const response = await fetch('/set_prosthetic', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prosthetic })
-          });
-
-          const data = await response.json();
-
-          if (data.error) {
-            console.error("Error setting prosthetic:", data.error);
-            alert("Error loading prosthetic documents.");
-          } else {
-            console.log("RAG initialized for:", prosthetic);
-            alert(`Loaded documents for: ${prosthetic}`);
-          }
-        } catch (err) {
-          console.error("Failed to send prosthetic to backend:", err);
-          alert("Server error. Please try again.");
-        }
-      });
 
       /********************************************
        * UPLOAD FUNCTIONALITY (INLINE)
