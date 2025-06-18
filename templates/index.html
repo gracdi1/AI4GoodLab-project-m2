@@ -291,7 +291,6 @@
       <div id="recommendationResult" style="margin-top: 1rem;">
         <p><strong>Exercise:</strong> <span id="exerciseOutput">N/A</span></p>
         <p><strong>Prosthetic limb type:</strong> <span id="prostheticOutput">N/A</span></p>
-        <p><strong>Source(s):</strong> <span id="stepSource">N/A</span></p>
         <p><strong>Exercise Purpose:</strong> <span id="purposeOutput">N/A</span></p>
         <p><strong>Common Mistakes:</strong> <span id="mistakesOutput">N/A</span></p>
 
@@ -366,6 +365,7 @@
           </div>
         </div>
       </div>
+      <p><strong>Source(s):</strong> <span id="stepSource">N/A</span></p>
     </section>
 
 
@@ -902,18 +902,22 @@
       /********************************************
        * UPLOAD FUNCTIONALITY (INLINE)
        *******************************************/
-      document.getElementById('inlinePdfFileInput').addEventListener('change', function() {
+
+       document.addEventListener('DOMContentLoaded', () => {
+        
+        let uploadedFileName = null;
+        
+        document.getElementById('inlinePdfFileInput').addEventListener('change', function () {
           const fileNameDisplay = document.getElementById('inlineFileNameDisplay');
           if (this.files.length > 0) {
-              fileNameDisplay.textContent = this.files[0].name;
-              // Automatically upload when file is selected
-              uploadPdfFile(this.files[0]);
+            fileNameDisplay.textContent = this.files[0].name;
+            uploadPdfFile(this.files[0]);
           } else {
-              fileNameDisplay.textContent = 'No file chosen';
+            fileNameDisplay.textContent = 'No file chosen';
           }
-      });
+        });
 
-      async function uploadPdfFile(file) {
+        async function uploadPdfFile(file) {
           const uploadStatus = document.getElementById('inlineUploadStatus');
           uploadStatus.textContent = 'Uploading...';
           uploadStatus.style.color = '#007bff';
@@ -922,50 +926,61 @@
           formData.append('pdf_file', file);
 
           try {
-              const response = await fetch('/upload_pdf', {
-                  method: 'POST',
-                  body: formData
-              });
+            const response = await fetch('/upload_pdf', {
+              method: 'POST',
+              body: formData
+            });
 
-              const data = await response.json();
+            const data = await response.json();
 
-              if (response.ok) {
-                  uploadStatus.textContent = data.message || 'File uploaded successfully!';
-                  uploadStatus.style.color = '#28a745'; // Green for success
-              } else {
-                  uploadStatus.textContent = data.error || 'Error uploading file.';
-                  uploadStatus.style.color = '#dc3545'; // Red for error
-              }
-          } catch (error) {
-              console.error('Upload error:', error);
-              uploadStatus.textContent = 'Network error or server unreachable.';
-              uploadStatus.style.color = '#dc3545'; // Red for error
-          }
-      }
-
-      document.getElementById('cancelUploadBtn').addEventListener('click', async function() {
-       // Clear UI elements
-        document.getElementById('inlinePdfFileInput').value = "";
-        document.getElementById('inlineFileNameDisplay').textContent = 'No file chosen';
-        document.getElementById('inlineUploadStatus').textContent = '';
-    
-        // Notify backend if file was uploaded
-        if (uploadedFileName) {
-            try {
-                const res = await fetch('/remove_pdf', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ filename: uploadedFileName })
-                });
-                const data = await res.json();
-                alert(data.message || data.error);
-                uploadedFileName = null;
-            } catch (error) {
-                console.error('Error removing file:', error);
+            if (response.ok) {
+              uploadedFileName = data.filename;
+              console.log("Upload successful, stored filename:", uploadedFileName);
+              uploadStatus.textContent = data.message || 'File uploaded successfully!';
+              uploadStatus.style.color = '#28a745';
+            } else {
+              uploadStatus.textContent = data.error || 'Error uploading file.';
+              uploadStatus.style.color = '#dc3545';
             }
+          } catch (error) {
+            console.error('Upload error:', error);
+            uploadStatus.textContent = 'Network error or server unreachable.';
+            uploadStatus.style.color = '#dc3545';
+          }
         }
+
+        document.getElementById('cancelUploadBtn').addEventListener('click', async function () {
+          console.log("Cancel Upload clicked"); // 🔍 Confirm this fires
+
+          document.getElementById('inlinePdfFileInput').value = "";
+          document.getElementById('inlineFileNameDisplay').textContent = 'No file chosen';
+          document.getElementById('inlineUploadStatus').textContent = '';
+
+          const user_prosthetic = document.getElementById('prostheticInput').value;
+
+          if (uploadedFileName) {
+            console.log("Attempting to remove:", uploadedFileName);
+            try {
+              const res = await fetch('/remove_pdf', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  filename: uploadedFileName,
+                  user_prosthetic: user_prosthetic
+                })
+              });
+              const data = await res.json();
+              alert(data.message || data.error);
+              uploadedFileName = null;
+            } catch (error) {
+              console.error('Error removing file:', error);
+            }
+          } else {
+            console.log("No uploaded file to remove.");
+          }
+        });
       });
 
       /********************************************
