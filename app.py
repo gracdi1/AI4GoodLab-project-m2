@@ -482,15 +482,14 @@ def analyze_video():
         You are a physiotherapist reviewing a video of a person performing the exercise: "{llm_to_vlm['exercise']}".
 
         Your tasks are:
-        1. Assess whether the person is correctly following these prescribed steps:
-        {llm_to_vlm['steps']}
+        1. Assess whether the person is correctly following these prescribed steps: {llm_to_vlm['steps']}
 
-        2. Identify any mistakes or deviations in their form, especially these common ones:
-        {llm_to_vlm['mistake']}
+        2. Identify if the person is making any of these common mistakes: {llm_to_vlm['mistake']}
 
-        3. Provide clear, specific feedback and corrections to help them perform the exercise accurately and safely.
+        3. Provide clear, specific corrections on their form to help them perform the exercise accurately and safely.
 
         Make your response actionable, supportive, and easy to follow, as if you were coaching them in person.
+        Do not do an introduction or conclusion.
         """
         print(prompt)
 
