@@ -28,7 +28,6 @@ import requests
 from dotenv import load_dotenv
 load_dotenv() # Call this at the very beginning
 
-print('DEBUG: GOOGLE_API_KEY', os.getenv('GOOGLE_API_KEY'))
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
 # Google Generative AI imports
@@ -90,10 +89,12 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 '''
 
 # --- Global Variables for Exercise State ---
+prosthetic_types = ["transtibial", "transfemoral"]
 current_exercise_steps = []
 current_exercise_index = 0
 vlm_model = None # To be initialized with gemini-pro-vision
 llm_to_vlm = None
+global_mode = None
 '''
     initialize variables that will be used for the step-by-step instructions feature
 '''
@@ -101,98 +102,160 @@ llm_to_vlm = None
 # --- RAG Setup (Load PDFs and Create Vector Store) ---
 vectorstore = None # store vector database (from contents of PDFs) + search for info
 llm = None # store LLM (text-only Gemini model)
-qa_chain = None # RAG chain: combines vectorstore + LLM (q-a pipeline)
+current_retriever = None
 
-def setup_llm_and_rag():
-    global vectorstore, llm, qa_chain, vlm_model
-
-    # 1. Load your PDF files
-    pdf_folder = r"./data"
-    print("Using pdf_folder path:", pdf_folder)
-    pdf_paths = [os.path.join(pdf_folder, f) for f in os.listdir(pdf_folder) if f.endswith(".pdf")]
+def setup_llm_and_rag(pdf_file_path=None, mode='default_doc'):
+    global vectorstore, llm, vlm_model, global_mode
     
+    if mode == 'default_doc':
+        # Initialize Google Gemini LLM (for text-based recommendation)
+        try:
+            llm = GoogleGenerativeAI(model="gemini-2.0-flash")
+            print("Google Gemini LLM for text initialized successfully.")
+        except Exception as e:
+            print(f"Error initializing text LLM: {e}")
+            return False
+
+        # Initialize Google Gemini VLM (for vision-based analysis)
+        try:
+            vlm_model = ChatGoogleGenerativeAI(model="gemini-2.0-flash")
+            print("Google Gemini VLM initialized successfully.")
+        except Exception as e:
+            print(f"Error initializing VLM: {e}")
+            return False
+
+    # Load your PDF files
     documents = []
-    for pdf_path in pdf_paths:
-        if os.path.exists(pdf_path):
-            try:
-                loader = PyPDFLoader(pdf_path)
-                documents.extend(loader.load())
-            except Exception as e:
-                print(f"Failed to load {pdf_path}: {e}")
-        else:
-            print(f"Warning: PDF file not found at {pdf_path}")
+    
+    if mode == 'uploaded_pdf': # if user uploads a pdf
+        global_mode = mode
+        if pdf_file_path and os.path.exists(pdf_file_path): # use pdf instead
+            print(f"Loading uploaded PDF: {pdf_file_path}")
+            loader = PyPDFLoader(pdf_file_path)
+            documents = loader.load()
+            for doc in documents:
+                doc.metadata["category"] = mode
+        else: # error
+            print("No valid PDF path provided.")
+            return False
+
+    elif mode == 'default_doc': # if user lists exercises but no pdf
+        global_mode = mode
+        for prosthetic_type in prosthetic_types:
+            pdf_folder = os.path.join("data", prosthetic_type)
+            print("Using pdf_folder path:", pdf_folder)
+            pdf_paths = [os.path.join(pdf_folder, f) for f in os.listdir(pdf_folder) if f.endswith(".pdf")]
+            
+            for pdf_path in pdf_paths:
+                if os.path.exists(pdf_path):
+                    try:
+                        loader = PyPDFLoader(pdf_path)
+                        loaded_docs = loader.load()
+                        
+                        # set category metadata for each loaded doc
+                        for doc in loaded_docs:
+                            doc.metadata["category"] = mode + prosthetic_type
+
+                        documents.extend(loaded_docs)
+                        print(f"Path: \n {pdf_path}")
+                        print(len(documents))
+                    
+                    except Exception as e:
+                        print(f"Failed to load {pdf_path}: {e}")
+                else:
+                    print(f"Warning: PDF file not found at {pdf_path}")
+
+    else:
+        print("Unknown mode or missing PDF.")
+        return False
+    
     ''' 
         loads booklet as a list of pages 
         each page is a separate Document obj
     '''
-
-    # 2. Split documents into chunks
+    
+    # split and embed documents based on mode
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    texts = []
     texts = text_splitter.split_documents(documents)
-    ''' 
-        (~1000 characters), essential for RAG precision 
-    '''
-
-    # 3. Create embeddings using GoogleGenerativeAIEmbeddings
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    '''
-        text chunks -> high-dimensional numerical vectors (needed for semantic search)
-    '''
-
-    # 4. Create a vector store from the embeddings
-    vectorstore = Chroma.from_documents(texts, embeddings)
-    print("Vector store created successfully.") # Chroma database = fast, relevant look-up
-
-    # 5. Initialize Google Gemini LLM (for text-based recommendation)
     try:
-        # Use a text-only model for initial recommendation
-        llm = GoogleGenerativeAI(model="gemini-2.0-flash") # Updated to flash for potentially faster response
-        print("Google Gemini LLM for text initialized successfully.")
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        vectorstore = Chroma.from_documents(texts, embeddings) 
+        print(f"Stored {len(texts)} chunks in mode '{mode}'")
+        return True
     except Exception as e:
-        print(f"Error initializing text LLM: {e}")
-        llm = None
-    '''
-        text-only Gemini model
-        generate answers based on booklet content + user questions
-    '''
+        print(f"Error creating vectorstore: {e}")
+        return False
 
-    # 6. Initialize Google Gemini VLM (for vision-based analysis)
+# upload PDF endpoint and run RAG setup (loads pDF, embeds docs, initialize LLMs)
+@app.route('/upload_pdf', methods=['POST'])
+def upload_pdf():
+    if 'pdf_file' not in request.files:
+        return jsonify({"error": "No file part in request"}), 400
+
+    file = request.files['pdf_file']
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+    if not file.filename.lower().endswith('.pdf'):
+        return jsonify({"error": "Only PDF files are allowed"}), 400
+
     try:
-        vlm_model = ChatGoogleGenerativeAI(model="gemini-2.0-flash") # Use a model with vision for frame analysis
-        print("Google Gemini VLM initialized successfully.")
-    except Exception as e:
-        print(f"Error initializing VLM: {e}")
-        vlm_model = None
-    '''
-        handles image inputs AND text 
-    '''
+        save_path = os.path.join("uploads", file.filename)
+        file.save(save_path)
 
-    # 7. Create the RAG chain
-    if llm and vectorstore:
-        qa_chain = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="stuff",
-            retriever=vectorstore.as_retriever()
-        )
-        print("RAG QA chain created.")
+        success = setup_llm_and_rag(pdf_file_path=save_path, mode='uploaded_pdf')
+
+        if success:
+            return jsonify({
+                "message": f"PDF '{file.filename}' uploaded and RAG system initialized.",
+                "filename": file.filename
+            }), 200
+        else:
+            return jsonify({"error": "Failed to initialize RAG system with uploaded PDF"}), 500
+
+    except Exception as e:
+        return jsonify({"error": f"Upload failed: {str(e)}"}), 500
+
+
+@app.route('/remove_pdf', methods=['POST'])
+def remove_pdf():
+    global global_mode
+    data = request.get_json()
+    filename = data.get('filename')
+    user_prosthetic = data.get('user_prosthetic')
+
+    print("Received request to remove PDF")
+
+    if not filename:
+        return jsonify({"error": "Filename not provided"}), 400
+
+    file_path = os.path.join("uploads", filename)
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+            print(f"PDF '{filename}' removed successfully")
+
+            # Reset to mode = default_doc
+            success = setup_llm_and_rag(mode='default_doc')
+            if not success:
+                return jsonify({"error": f"Uploaded File '{filename}' is removed."}), 500
+            return jsonify({"message": f"PDF '{filename}' removed and reset to use database (default_mode)."})
+        
+        except Exception as e:
+            return jsonify({"error": f"Error deleting file: {str(e)}"}), 500
     else:
-        print("Could not create RAG QA chain. Check LLM and vectorstore setup.")
-    '''
-        combines the vector store (find relevant text) + LLM (generate answers)
-        QUESTION: will we be using RAG for our VLM as well?
-    '''
+        return jsonify({"error": "File does not exist"}), 404
 
-# Run RAG setup on server start
-with app.app_context():
-    setup_llm_and_rag() 
-'''
-    initialize LangChain RAG pipeline:
-    loads pDF, embeds docs, initialize LLMs, set up qa_chain for user queries
-'''
 
 # display main webpage (html file from templates folder)
 @app.route('/')
 def index():
+    # clean up uploaded files
+    upload_folder = "uploadeds"
+    if os.path.exists(upload_folder):
+        shutil.rmtree(upload_folder)
+        os.makedirs(upload_folder)  # recreate empty folder
+        
     return render_template('index.html')
 
 # main function: POST reqs, take in user prompt, queries RAG, parses LLM output
@@ -202,69 +265,70 @@ def index():
 '''
 @app.route('/ask_llm', methods=['POST'])
 def ask_llm():
-    global current_exercise_steps, current_exercise_index # Use globals
+    global current_exercise_steps, current_exercise_index, global_mode # Use globals
 
     # 1. get symptoms input -> change to get exercises/type of prosthetic
     ''' 
         when a client sends a POST request to the Flask route (/ask_llm) the data 
         must be in JSON format and must contain a key called "symptoms" 
     '''
-    print(request.json)
-    print("*******************")
-    user_details = request.json.get('prosthetic')
-    if not user_details:
+    
+    user_prosthetic = request.json.get('prosthetic')
+    if not user_prosthetic:
         return jsonify({"error": "No details provided"}), 400
+    user_leg = request.json.get('leg')
+    if not user_leg:
+        return jsonify({"error": "No details provided"}), 400
+    user_details = user_prosthetic + user_leg
+    
     user_exercises = request.json.get('exercises')
     exercise_purpose = ['Strength', 'Mobility', 'Balance', 'Agility'] # needed?
     if not user_exercises:
         return jsonify({"error": "No exercises provided"}), 400
 
-    if not qa_chain: # ensure qa_chain is set up
-        return jsonify({"error": "LLM or RAG not initialized. Please check server logs and API key."}), 500
-
     # 2. build the prompt: instructs the LLM what to do 
-    ''' outline:
-        - retrieve relevant exercises from doc based on symptoms
-        - provide clear steps
-        - indicate if supervision is required 
-        - fall back to general knowledge if PDF has no matches 
-
-        change to: 
-        - retrieve relevant exercises from doc if user has provided names of exercises 
-        - get exercises from user uploaded PDF if uploaded 
+    ''' 
+        - retrieve relevant exercises froms doc based on user's provided names of exercises 
         - explain the exercise + include common errors
-        - state  how to position selves in front of camera
-        - add feedback option (provide alternatives if this exercise is too difficult)
+
+        still need to add: 
+        - state how to position selves in front of camera
+        - add feedback option (provide alternatives) ?
     '''
     try:
-        prompt = ( # should we also add when they were released from physio??
-            # for testing purposes add a line that states which documents were used
+        prompt = (
             f"You are a virtual rehabilitation assistant "
             f"to help guide users with lower limb prosthetics through their rehabilitation exercises. "
-            f"Given the following exercises: {user_exercises}, provide a step-by-step description of the exercises "
-            f"based on the user's type of prosthetic: {user_details}. Use the provided documents to find exercises descriptions. "
-            f"The description must be tailored towards the user's type of prosthetic."
-            f"If you could not find the exercise provided specific to the user's prosthetic, suggest an alternative based on the documents provided. "
-            f"For each exercise, also state the types of prosthetic limb that this exercise is used for. "
-            f"For each exercise, also state the purpose of the exercise. Choose the best option from {exercise_purpose}"
-            f"For each recommended exercise, also state commmon mistakes that individuals make "
-            f"when performing the exercises, so the user is aware. "
-            f"IMPORTANT: If you could not find any related exercise from documents provided, please answer based on your general knowledge. "
-            f"Additionally, provide the exercise steps clearly. "
-            f"Format your response as follows:\n\n"
+            f"Given the following exercise(s): {user_exercises} and"
+            f"the user's type and location of prosthetic: {user_details}, " 
+            f"use the provided documents to find step-by-step instructions for each exercise."
+
+            f"IMPORTANT INSTRUCTIONS:\n"
+            f"1. Only provide ONE VERSION of steps for each exercise.\n"
+            f"2. If multiple descriptions exist, merge them into one clean and non-redundant step-by-step list,"
+            f"   avoiding duplicated or alternative step formats. Do NOT list both versions."
+            f"3. ONLY IF the exercise(s) inputted by the user are NOT found, suggest the closest alternative from the documents.\n"
+            f"4. For EACH exercise, include:\n"
+            f"   - Prosthetic limb type(s) that use this exercise\n"
+            f"   - The purpose (choose from {exercise_purpose})\n"
+            f"   - commmon mistakes that individuals make when performing the exercises\n"
+            f"   - Clear step-by-step instructions\n"
+            f"5. If nothing relevant is found, please use general knowledge.\n"
+
+            f"Please format your response like this:\n\n"
+
             f"Exercise: [Name of Exercise]\n"
-            f"Prosthetic limb type(s): [Type of Prosthetic Limb(s) that Utilize the Exercise]"
-            f"Purpose: [The purpose of the exercise]"
-            f"Common mistakes: [Common Mistakes the User Should be Aware of]"
-            f"Exercise 1:"
+            f"Prosthetic limb type(s): [e.g., transfemoral, transtibial]\n"
+            f"Purpose: [e.g., Balance, Mobility]\n"
+            f"Common mistakes: [Common mistakes that individuals make]\n"
             f"Steps:\n"
-            f"1. [Step 1 description]\n"
-            f"2. [Step 2 description]\n"
-            f"Exercise 2:"
+            f"1. [Step one]\n"
+            f"2. [Step two]\n"
             f"...\n\n"
-            f"Recommended Exercises:"
-            f"IMPORTANT: If you could not find any related exercise from documents provided, answer based on your general knowledge."
-        )
+
+            f"IMPORTANT: only provide ONE VERSION of steps for EACH exercise."
+             
+            )
         print(prompt)
         
         # 3. querry LLM chain via qa_chain (run the RAG process)
@@ -272,15 +336,37 @@ def ask_llm():
             RAG process: search the vectorstore + pass results to LLM
             returns a dictionary with "result" as key based on PDFs
         '''
-        response = qa_chain.invoke({"query": prompt})
-        exercise_recommendation_full_text = response.get("result", "Could not find a suitable exercise.")
-        print(f'here: {response}')
+        print('global mode: ',global_mode)
+        if global_mode == 'uploaded_pdf': # upload pdf mode
+            retriever = vectorstore.as_retriever(search_kwargs={
+                "filter": {"category": global_mode}
+                }
+            )
+        elif global_mode == 'default_doc': # if default mode then have the category = mode + prosthetic
+            print(user_prosthetic)
+            retriever = vectorstore.as_retriever(search_kwargs={
+                "filter": {"category": global_mode + user_prosthetic}
+                }
+            )
+        
+        qa_chain = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=retriever,
+            return_source_documents=True
+        )
+        
+        result = qa_chain.invoke({"query": prompt})
+        exercise_recommendation_full_text = result.get("result", "Could not find a suitable exercise.")
+        sources = result.get("source_documents", [])
+        source_names = list({doc.metadata.get("source", "Unknown document") for doc in sources})
+        print("Source PDFs used:", source_names)
 
         # extract using regex patterns
         exercise = re.search(r"Exercise:\s*(.*?)\s*Prosthetic", exercise_recommendation_full_text)
         prosthetic = re.search(r"Prosthetic limb type\(s\):\s*(.*?)\s*Purpose", exercise_recommendation_full_text)
         purpose = re.search(r"Purpose:\s*(.*?)\s*Common mistakes", exercise_recommendation_full_text)
-        mistakes = re.search(r"Common mistakes:\s*(.*?)\s*Exercise", exercise_recommendation_full_text)
+        mistakes = re.search(r"Common mistakes:\s*(.*?)\s*Steps", exercise_recommendation_full_text)
         print(exercise, prosthetic, purpose, mistakes)
         
         # 4. parse response to get supervision and steps 
@@ -316,17 +402,18 @@ def ask_llm():
 
 
         # return JSON (exercises, steps, etc) to Frontend (to be displayed on screen)
-        global llm_to_vlm 
+        global llm_to_vlm
         response_data = {
             "exercise": exercise.group(1) if exercise else "",
             "prosthetic": prosthetic.group(1) if prosthetic else "",
             "purpose": purpose.group(1) if purpose else "",
             "mistake": mistakes.group(1) if mistakes else "",
-            "steps": current_exercise_steps
+            "steps": current_exercise_steps,
+            "user_info": user_prosthetic,
+            "sources": source_names
         }
 
         llm_to_vlm = response_data
-
         return jsonify(llm_to_vlm)
     
     # fail safe for any error (eg: LLM API failure)
@@ -477,20 +564,49 @@ def analyze_video():
         base64_data = video_data.get('base64')
         mime_type = video_data.get('mimeType', 'video/mp4')
 
-        # define prompt 
-        prompt = f"""
+        '''llm_to_vlm['steps'] = f"""Steps:
+                    1. Lie on your operative side.
+                    2. Lift your non-residual limb straight up, keeping your residual limb straight in line with your hip.
+                    3. Relax.
+                    4. Repeat."""
+                    '''
+
+        # define prompt    
+        prompt = f""" 
         You are a physiotherapist reviewing a video of a person performing the exercise: "{llm_to_vlm['exercise']}".
-
+        
         Your tasks are:
-        1. Assess whether the person is correctly following these prescribed steps: {llm_to_vlm['steps']}
+            1. Assess whether the person is correctly following these prescribed steps:
+            {llm_to_vlm['steps']}. If any steps are performed incorrectly, please state which steps
+            and provide corrections.
+            2. Identify if the person makes any of these mistakes: {llm_to_vlm['mistake']}. 
+            Make sure to identify incorrect form, posture, and positioning of the body.
+            If any mistakes are made, please state which mistakes and provide corrections.
+        
+        Please highlight if there are any safety concerns or hazards
+        
+        IMPORTANT: Ensure the feedback is specific, concise, and supportive, as if you were
+        coaching the user in person. 
 
-        2. Identify if the person is making any of these common mistakes: {llm_to_vlm['mistake']}
+        Please format your response like this:
 
-        3. Provide clear, specific corrections on their form to help them perform the exercise accurately and safely.
+        Does the user have a amputation? [Yes/No]
+        What is the amputation? 
+        What is the user doing?
 
-        Make your response actionable, supportive, and easy to follow, as if you were coaching them in person.
-        Do not do an introduction or conclusion.
+        Steps done correctly: [Yes/No]
+            Corrections: [N/A if not]
+        Correct form and posture: [Yes/No]
+            Corrections: [N/A if not]
+
+
         """
+        print(prompt)
+
+        # with a limb amputation
+        # IMPORTANT: This person has this amputation: {llm_to_vlm['user_info']} The person may or may not be wearing a prosthetic in this video. Make sure 
+        # your response is cognizant of this.
+
         print(prompt)
 
         # put into parts for gemini
@@ -572,4 +688,9 @@ def analyze_video():
         }), 500
 
 if __name__ == '__main__':
+    if os.path.exists("./data"):
+        print("Initializing with default PDFs from /data...")
+        setup_llm_and_rag(mode='default_doc')
+    else:
+        print("No default PDF folder found. Upload required.")
     app.run(debug=True)
