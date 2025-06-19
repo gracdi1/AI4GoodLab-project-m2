@@ -9,6 +9,7 @@ import time
 import numpy as np
 import re
 import requests
+import shutil
 '''
     Flask: web framework in Python
         request: access data sent in an HTTP request
