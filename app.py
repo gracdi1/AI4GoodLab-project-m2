@@ -610,6 +610,13 @@ def analyze_video():
 
         print(prompt)
 
+        # with a limb amputation
+        # IMPORTANT: This person has this amputation: {llm_to_vlm['user_info']} The person may or may not be wearing a prosthetic in this video. Make sure 
+        # your response is cognizant of this.
+
+
+        print(prompt)
+
         # put into parts for gemini
         parts = [{"text": prompt}]
 
