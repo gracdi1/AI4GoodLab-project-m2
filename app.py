@@ -584,7 +584,7 @@ def analyze_video():
             Make sure to identify incorrect form, posture, and positioning of the body.
             If any mistakes are made, please state which mistakes and provide corrections.
         
-        Please highlight if there are any safety concerns or hazards
+        Please highlight if there are any safety concerns or hazards.
         
         IMPORTANT: Ensure the feedback is specific, concise, and supportive, as if you were
         coaching the user in person. 
@@ -599,14 +599,7 @@ def analyze_video():
             Corrections: [N/A if not]
         Correct form and posture: [Yes/No]
             Corrections: [N/A if not]
-
-
         """
-        print(prompt)
-
-        # with a limb amputation
-        # IMPORTANT: This person has this amputation: {llm_to_vlm['user_info']} The person may or may not be wearing a prosthetic in this video. Make sure 
-        # your response is cognizant of this.
 
         print(prompt)
 
