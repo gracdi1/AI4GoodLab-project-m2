@@ -12,6 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400&display=swap" rel="stylesheet" />
 
     <!--  Brand palette & a couple of overrides  -->
     <style>
@@ -29,20 +30,262 @@
         color:#fff;
         font-weight:600;
       }
+
+      /*OG CSS*/
+      /* -----------  BASIC LAYOUT  ----------- */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 2rem;
+        font-family: Arial, sans-serif;
+        background: #ffffff;
+        color: #222;
+      }
+      h1 {
+        margin-top: 0;
+      }
+
+      /* -----------  TABS  ----------- */
+      .tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .tab-button {
+        padding: 0.6rem 1.2rem;
+        border: 1px solid #ccc;
+        border-bottom: none;
+        background: #ffae68;
+        border-radius: 0.5rem 0.5rem 0 0;
+        cursor: pointer;
+        transition: background 0.2s;
+        color: #222;
+      }
+      .tab-button:hover {
+        background: #dcdcdc;
+      }
+      .tab-button.active {
+        background: #ff661f;
+        font-weight: 600;
+      }
+      .tab-content {
+        border: 1px solid #ccc;
+        border-radius: 0 0.5rem 0.5rem 0.5rem;
+        background: #fff;
+        padding: 1.25rem;
+        min-height: 18rem;
+      }
+      .hidden {
+        display: none !important;
+      }
+
+      /* -----------  SYMPTOM FORM  ----------- */
+      textarea {
+        width: 100%;
+        max-width: 100%;
+        min-height: 7rem;
+        padding: 0.5rem;
+        resize: vertical;
+        border: 1px solid #ccc;
+        border-radius: 0.25rem;
+      }
+      button {
+        padding: 0.6rem 1rem;
+        border: none;
+        border-radius: 0.25rem;
+        background: #3620ff;
+        color: #fff;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      button:hover {
+        background: #214aff;
+      }
+      button.secondary {
+        background: #6c757d;
+      }
+      button.secondary:hover {
+        background: #5b636b;
+      }
+      button:disabled {
+        background: #b6b6b6;
+        cursor: not-allowed;
+      }
+
+      /* Styles for the file upload input (adjusted for inline use) */
+      .file-upload-inline-container {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .file-upload-inline-container input[type="file"] {
+        display: none;
+      }
+      .file-upload-inline-container .custom-file-upload {
+        display: inline-block;
+        padding: 0.6rem 1rem;
+        border: none;
+        border-radius: 0.25rem;
+        background: #3620ff;
+        color: #fff;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .file-upload-inline-container .custom-file-upload:hover {
+        background: #214aff;
+      }
+      .file-upload-inline-container .file-name {
+          margin-left: 0.5rem;
+          font-style: italic;
+          color: #555;
+          flex-grow: 1;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+      }
+
+      /* -----------  EXERCISE AREA  ----------- */
+      .exercise-steps-container {
+        margin-top: 1rem;
+        padding: 1rem;
+        border: 1px dashed #007bff;
+        border-radius: 0.5rem;
+        background: #f0f7ff;
+      }
+      .exercise-steps-container ul {
+        padding-left: 1.2rem;
+      }
+      #webcam-container {
+        margin-top: 1.5rem;
+        text-align: center;
+        border: 1px solid #eee;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        background: #fcfcfc;
+      }
+      #videoElement {
+        width: 100%;
+        max-width: 640px;
+        aspect-ratio: 16/9;
+        background: #000;
+        border: 1px solid #aaa;
+        border-radius: 0.25rem;
+      }
+      .vlm-feedback {
+        margin-top: 0.8rem;
+        padding: 0.8rem;
+        border: 1px solid #dee2e6;
+        background: #f9f9f9;
+        border-radius: 0.25rem;
+        text-align: left;
+      }
+      .vlm-status {
+        font-weight: 600;
+      }
+      .button-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.8rem;
+      }
+      .video-preview {
+            margin: 20px 0;
+            text-align: center;
+      }
+      .video-preview video {
+          max-width: 100%;
+          max-height: 300px;
+          border-radius: 8px;
+      }
+      .feedback-section {
+          margin-top: 30px;
+          padding: 20px;
+          background: #f8f9fa;
+          border-radius: 8px;
+          display: none;
+      }
+      .feedback-section.show {
+          display: block;
+      }
+
+      /* Video analysis container */
+      #video-analysis-container {
+        display: none;
+        margin-top: 2rem;
+        padding: 1.5rem;
+        border: 1px solid #ddd;
+        border-radius: 0.5rem;
+        background: #fff;
+      }
+
+      #video-analysis-container.show {
+        display: flex;
+        gap: 2rem;
+        align-items: flex-start;
+      }
+
+      .video-display {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .video-display video {
+        width: 100%;
+        max-width: 400px;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      }
+
+      .analysis-feedback {
+        flex: 1;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 0.5rem;
+        border: 1px solid #e9ecef;
+      }
+
+      .analysis-feedback h3 {
+        margin-top: 0;
+        color: #495057;
+      }
+
+      .analyzing-spinner {
+        display: inline-block;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
     </style>
   </head>
 
-  <body>
-    <div class="max-w-4xl mx-auto p-6 space-y-8"></div>
-      <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <img src="assets/vehab-logo.png" alt="VEHAB logo"
-            class="h-14 sm:h-16 object-contain" />
+  <body class="bg-[var(--vehab-gray)]">
+    <div class="max-w-4xl mx-auto p-6 space-y-8">
+    <header
+      class="flex flex-col sm:flex-row items-center sm:justify-between gap-4
+            pt-4 pb-6 sm:py-8">
+      <img src="assets/vehab-logo.png" alt="VEHAB logo"
+          class="h-16 w-auto" />
 
-        <!-- optional tagline -->
-        <p class="text-sm text-gray-600 font-medium">
-          Your AI Prosthetic Rehab Assistant
-        </p>
-      </header>
+      <p class="text-sm sm:text-base font-light text-gray-600 tracking-wide"
+        style="font-family:'Inter',sans-serif">
+        Your&nbsp;AI&nbsp;Prosthetic&nbsp;Rehab&nbsp;Assistant
+      </p>
+    </header>
+
+
+
 
       <!--  TAB CONTROLS  -->
       <div class="flex gap-2">
@@ -63,7 +306,7 @@
       <section id="exerciseTab" class="tab-content">
         <h2>Step-by-Step Exercises</h2>
         <p>Describe your prosthetic/amputation type to get tailored exercise recommendations:</p>
-        <select id="prostheticInput">
+        <select id="prostheticInput" class="w-full sm:w-auto border rounded-md p-2 mt-1 outline-[var(--vehab-blue)]">
           <option value="" disabled selected>Select prosthetic/amputation type</option>
           <option value="transtibial">Transtibial (below knee)</option>
           <option value="transfemoral">Transfemoral (above knee)</option>
@@ -75,10 +318,14 @@
         </select>
         <br />
         <p>List the exercises recommended to you by your physiotherapist:</p>
-        <textarea id="exercisesInput" placeholder="e.g., Hamstring Stretch, Hip Extension on Side, Side Stepping."></textarea>
+        <textarea id="exercisesInput" rows="4"
+          class="w-full border rounded-md p-3 mt-1 resize-y outline-[var(--vehab-blue)]"
+          placeholder="e.g., Hamstring Stretch, …"></textarea>
         <br />
         <div class="button-row">
-          <button id="askButton">Get Recommendation</button>
+          <button id="askButton"        
+                class="bg-[var(--vehab-blue)] hover:bg-[var(--vehab-blue)]/90
+               text-white font-medium px-4 py-2 rounded-md transition">Get Recommendation</button>
           <br />
           <div class="file-upload-inline-container">
               <input type="file" name="pdf_file" id="inlinePdfFileInput" accept=".pdf">
@@ -209,6 +456,7 @@
           document.getElementById(targetId).classList.remove('hidden');
 
           document.querySelectorAll('.tab-button').forEach((b) => b.classList.remove('active'));
+          b.dataset.active = 'false';            
           btn.classList.add('active');
           btn.dataset.active = 'true';
 
@@ -833,7 +1081,9 @@
         *******************************************/
         document.addEventListener('DOMContentLoaded', () => {
           // open default tab
-          switchTab('symptomsTab', document.querySelector('.tab-button'));
+          /*switchTab('symptomsTab', document.querySelector('.tab-button'));*/
+          switchTab('exerciseTab', document.querySelector('.tab-button'));
+
         });
       </script>
     </div>
