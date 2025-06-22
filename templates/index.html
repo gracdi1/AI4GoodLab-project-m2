@@ -271,6 +271,21 @@
   </head>
 
   <body class="bg-[var(--vehab-gray)]">
+      <div id="homeScreen" class="min-h-screen flex flex-col items-center justify-center text-center space-y-8">
+      <img src="assets/vehab-logo.png" alt="VEHAB logo" class="h-24 w-auto" />
+
+      <p class="text-xl sm:text-2xl font-semibold text-gray-700 max-w-md">
+        Personalised, AI-powered rehabilitation for prosthetic users.
+      </p>
+
+      <button id="enterAppBtn"
+              class="bg-[var(--vehab-blue)] hover:bg-[var(--vehab-blue)]/90
+                    text-white font-medium px-6 py-3 rounded-md transition">
+        Get&nbsp;Started
+      </button>
+    </div>
+
+    <div id="appScreen" class="hidden">
     <div class="max-w-4xl mx-auto p-6 space-y-8">
     <header
       class="flex flex-col sm:flex-row items-center sm:justify-between gap-4
@@ -282,6 +297,12 @@
         style="font-family:'Inter',sans-serif">
         Your&nbsp;AI&nbsp;Prosthetic&nbsp;Rehab&nbsp;Assistant
       </p>
+            <!-- add inside your sticky header, right-aligned -->
+      <button id="homeBtn"
+              class="text-sm text-gray-500 hover:text-[var(--vehab-orange)] transition hidden">
+        Home
+      </button>
+
     </header>
 
 
@@ -433,6 +454,12 @@
 
       <!--  SCRIPT AREA  -->
       <script>
+        document.getElementById('enterAppBtn').addEventListener('click', () => {
+        document.getElementById('homeScreen').classList.add('hidden');
+        document.getElementById('appScreen').classList.remove('hidden');
+        // optional: scroll to top if user was scrolled down
+        window.scrollTo({top:0, behavior:'smooth'});
+      });
         /********************************************
         * GLOBAL STATE
         *******************************************/
@@ -1086,6 +1113,7 @@
 
         });
       </script>
+    </div>                     -->
     </div>
   </body>
 </html>
