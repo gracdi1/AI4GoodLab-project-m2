@@ -352,14 +352,6 @@ def ask_llm():
         qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
-<<<<<<< HEAD
-            retriever=retriever
-        )
-        
-        response = qa_chain.invoke({"query": prompt})
-        exercise_recommendation_full_text = response.get("result", "Could not find a suitable exercise.")
-        print(exercise_recommendation_full_text)
-=======
             retriever=retriever,
             return_source_documents=True
         )
@@ -369,7 +361,6 @@ def ask_llm():
         sources = result.get("source_documents", [])
         source_names = list({doc.metadata.get("source", "Unknown document") for doc in sources})
         print("Source PDFs used:", source_names)
->>>>>>> merge-branch
 
         # extract using regex patterns
         exercise = re.search(r"Exercise:\s*(.*?)\s*Prosthetic", exercise_recommendation_full_text)
@@ -417,12 +408,8 @@ def ask_llm():
             "purpose": purpose.group(1) if purpose else "",
             "mistake": mistakes.group(1) if mistakes else "",
             "steps": current_exercise_steps,
-<<<<<<< HEAD
-            "user_info": user_prosthetic
-=======
             "user_info": user_prosthetic,
             "sources": source_names
->>>>>>> merge-branch
         }
 
         llm_to_vlm = response_data
@@ -572,17 +559,10 @@ def analyze_video():
         if not data:
             return jsonify({'success': False, 'error': 'No data received'}), 400
         
-        
         video_data = data.get('videoData', {})
         base64_data = video_data.get('base64')
         mime_type = video_data.get('mimeType', 'video/mp4')
 
-<<<<<<< HEAD
-        
-        # define prompt    
-        prompt = f""" 
-        You are a physiotherapist reviewing a video of a person with a limb amputation performing the exercise: "{llm_to_vlm['exercise']}".
-=======
         '''llm_to_vlm['steps'] = f"""Steps:
                     1. Lie on your operative side.
                     2. Lift your non-residual limb straight up, keeping your residual limb straight in line with your hip.
@@ -593,7 +573,6 @@ def analyze_video():
         # define prompt    
         prompt = f""" 
         You are a physiotherapist reviewing a video of a person performing the exercise: "{llm_to_vlm['exercise']}".
->>>>>>> merge-branch
         
         Your tasks are:
             1. Assess whether the person is correctly following these prescribed steps:
@@ -607,47 +586,6 @@ def analyze_video():
         
         IMPORTANT: Ensure the feedback is specific, concise, and supportive, as if you were
         coaching the user in person. 
-<<<<<<< HEAD
-        IMPORTANT: This person has this amputation: {llm_to_vlm['user_info']} The person may or may not be wearing a prosthetic in this video. Make sure 
-        your response is cognizant of this.
-
-        Please format your response like this:
-
-        Steps done correctly: [Yes/No]
-            Corrections: [N/A if not]
-        Correct form and posture: [Yes/No]
-            Corrections: [N/A if not]
-
-        """
-
-        # TESTING WITH ABLE BODIED
-        '''
-        prompt = f""" 
-        You are a physiotherapist reviewing a video of a person performing the exercise: "{llm_to_vlm['exercise']}".
-        
-        Your tasks are:
-            1. Assess whether the person is correctly following these prescribed steps:
-            {llm_to_vlm['steps']}. If any steps are performed incorrectly, please state which steps
-            and provide corrections.
-            2. Identify if the person makes any of these mistakes: {llm_to_vlm['mistake']}. 
-            Make sure to identify incorrect form, posture, and positioning of the body.
-            If any mistakes are made, please state which mistakes and provide corrections.
-        
-        Please highlight if there are any safety concerns or hazards
-        
-        IMPORTANT: Ensure the feedback is specific, concise, and supportive, as if you were
-        coaching the user in person. 
-
-        Please format your response like this:
-
-        Steps done correctly: [Yes/No]
-            Corrections: [N/A if not]
-        Correct form and posture: [Yes/No]
-            Corrections: [N/A if not]
-
-        """
-        '''
-=======
 
         Please format your response like this:
 
@@ -666,7 +604,6 @@ def analyze_video():
         # with a limb amputation
         # IMPORTANT: This person has this amputation: {llm_to_vlm['user_info']} The person may or may not be wearing a prosthetic in this video. Make sure 
         # your response is cognizant of this.
->>>>>>> merge-branch
 
 
         print(prompt)
@@ -756,40 +693,3 @@ if __name__ == '__main__':
     else:
         print("No default PDF folder found. Upload required.")
     app.run(debug=True)
-<<<<<<< HEAD
-
-
-
-
-
-
-        #     prompt = f""" 
-        # You are a physiotherapist reviewing a video of a person performing the exercise: "{llm_to_vlm['exercise']}".
-        
-        # Your tasks are:
-        #     1. Assess whether the person is correctly following these prescribed steps:
-        #     {llm_to_vlm['steps']}. If any steps are performed incorrectly, please state which steps
-        #     and provide corrections.
-        #     2. Identify if the person makes any of these mistakes: {llm_to_vlm['mistake']}. 
-        #     Make sure to identify incorrect form, posture, and positioning of the body.
-        #     If any mistakes are made, please state which mistakes and provide corrections.
-        
-        # Please highlight if there are any safety concerns or hazards
-        
-        # IMPORTANT: Ensure the feedback is specific, concise, and supportive, as if you were
-        # coaching the user in person. 
-
-        
-        # Please format your response like this:
-
-        # Steps done correctly: [Yes/No]
-        #     Corrections: [N/A if not]
-        # Correct form and posture: [Yes/No]
-        #     Corrections: [N/A if not]
-        
-        # Safety concerns: [list any possible safety concerns, N/A if not]
-        
-
-        # """
-=======
->>>>>>> merge-branch
