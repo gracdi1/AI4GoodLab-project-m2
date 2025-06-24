@@ -20,13 +20,14 @@
 
       :root {
         --vehab-blue: #1d49a7;     /* sampled from logo */
+        --vehab-blue-rgb: 29, 73, 167; /* decimal RGB for #1d49a7 */
         --vehab-orange: #ef8f51;   /* sampled from logo */
         --vehab-gray: #f9fafb;
       }
 
       /* tab – Tailwind handles the base, this colours the active one */
       .tab-button.active{
-        background: var(--vehab-orange);
+        background: var(--vehab-blue);
         color:#fff;
         font-weight:600;
       }
@@ -58,28 +59,28 @@
 
       .tab-button {
         padding: 0.6rem 1.2rem;
-        border: 1px solid #ccc;
+        /* border: 1px solid #ccc;
         border-bottom: none;
         background: #ffae68;
         border-radius: 0.5rem 0.5rem 0 0;
         cursor: pointer;
         transition: background 0.2s;
-        color: #222;
+        color: #222; */
       }
-      .tab-button:hover {
+      /* .tab-button:hover {
         background: #dcdcdc;
       }
       .tab-button.active {
         background: #ff661f;
         font-weight: 600;
-      }
-      .tab-content {
+      } */
+      /* .tab-content {
         border: 1px solid #ccc;
         border-radius: 0 0.5rem 0.5rem 0.5rem;
         background: #fff;
         padding: 1.25rem;
         min-height: 18rem;
-      }
+      } */
       .hidden {
         display: none !important;
       }
@@ -119,16 +120,22 @@
       }
 
       /* Styles for the file upload input (adjusted for inline use) */
-      .file-upload-inline-container {
+      /* .file-upload-inline-container {
         display: flex;
         align-items: center;
         gap: 0.5rem;
         flex-wrap: wrap;
-      }
+      } */
       .file-upload-inline-container input[type="file"] {
         display: none;
       }
-      .file-upload-inline-container .custom-file-upload {
+
+      /* Add this new rule */
+      label[for="inlinePdfFileInput"] {
+        background: rgba(var(--vehab-blue-rgb), 0.8) !important;
+        color: white !important;
+      }
+      /* .file-upload-inline-container .custom-file-upload {
         display: inline-block;
         padding: 0.6rem 1rem;
         border: none;
@@ -150,7 +157,7 @@
           overflow: hidden;
           white-space: nowrap;
           text-overflow: ellipsis;
-      }
+      } */
 
       /* -----------  EXERCISE AREA  ----------- */
       .exercise-steps-container {
@@ -272,7 +279,7 @@
 
   <body class="bg-[var(--vehab-gray)]">
       <div id="homeScreen" class="min-h-screen flex flex-col items-center justify-center text-center space-y-8">
-      <img src="assets/vehab-logo.png" alt="VEHAB logo" class="h-24 w-auto" />
+      <img src="{{ url_for('static', filename='assets/vehab-logo.png') }}" alt="VEHAB logo" class="h-24 w-auto" />
 
       <p class="text-xl sm:text-2xl font-semibold text-gray-700 max-w-md">
         Personalised, AI-powered rehabilitation for prosthetic users.
@@ -290,7 +297,7 @@
     <header
       class="flex flex-col sm:flex-row items-center sm:justify-between gap-4
             pt-4 pb-6 sm:py-8">
-      <img src="assets/vehab-logo.png" alt="VEHAB logo"
+      <img src="{{ url_for('static', filename='assets/vehab-logo.png') }}" alt="VEHAB logo"
           class="h-16 w-auto" />
 
       <p class="text-sm sm:text-base font-light text-gray-600 tracking-wide"
@@ -309,9 +316,35 @@
 
 
       <!--  TAB CONTROLS  -->
-      <div class="flex gap-2">
+    <div class="flex justify-center mt-4">
+      <div class="inline-flex divide-x divide-gray-300 overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
+        <button
+          type="button"
+          class="tab-button px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors 
+          data-[active=true]:bg-var[(--vehab-blue-rgb), 0.2] data-[active=true]:text-gray-900 hover:bg-gray-50 hover:text-gray-900 focus:relative"
+          data-target="exerciseTab"
+          data-active="true"
+        >
+          Exercise
+        </button>
+
+        <button
+          type="button"
+          class="tab-button px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors 
+          data-[active=true]:bg-var[(--vehab-blue-rgb), 0.2] data-[active=true]:text-gray-900 hover:bg-gray-50 hover:text-gray-900 focus:relative"
+          data-target="recommendTab"
+          data-active="false"
+        >
+          Get Recommendations
+        </button>
+      </div>
+    </div>
+
+
+
+      <!-- <div class="flex gap-2">
         <button class="tab-button px-4 py-2 rounded-t-lg bg-[var(--vehab-orange)]/40
-                      transition-colors data-[active=true]:bg-[var(--vehab-orange)] text-sm"
+                      transition-colors data-[active=true]:bg-[var(--vehab-orange)]"
                 data-target="exerciseTab" data-active="true">
           Exercise
         </button>
@@ -320,50 +353,68 @@
                       transition-colors" data-target="recommendTab">
           Get Recommendations
         </button>
-      </div>
+      </div> -->
 
 
       <!--  EXERCISE TAB  -->
-      <section id="exerciseTab" class="tab-content">
-        <h2>Step-by-Step Exercises</h2>
-        <p>Describe your prosthetic/amputation type to get tailored exercise recommendations:</p>
-        <select id="prostheticInput" class="w-full sm:w-auto border rounded-md p-2 mt-1 outline-[var(--vehab-blue)]">
+      <section id="exerciseTab" class="tab-content flex flex-col items-center text-center mx-auto w-full max-w-3xl space-y-8">
+
+        <div class="text-2xl font-semibold text-gray-900 sm:text-3xl mt-4 mb-2">
+          Describe your prosthetic/amputation type to get tailored exercise recommendations.
+        </div>
+        
+        <div class="flex flex-row"> 
+        <select id="prostheticInput" class="w-full sm:w-auto border rounded-md p-2 mt-2 mb-10 outline-[var(--vehab-blue)]">
           <option value="" disabled selected>Select prosthetic/amputation type</option>
           <option value="transtibial">Transtibial (below knee)</option>
           <option value="transfemoral">Transfemoral (above knee)</option>
+          <option value="able-bodied">I am able bodied</option>
         </select>
-        <select id="legInput">
+        <select id="legInput" class="hidden w-full sm:w-auto border rounded-md p-2 mt-2 mb-10 outline-[var(--vehab-blue)]">
           <option value="" disabled selected>Select right or left leg</option>
           <option value="right">Right leg</option>
           <option value="left">Left leg</option>
+          <option value="bilateral">Bilateral (not yet supported)</option>
         </select>
-        <br />
-        <p>List the exercises recommended to you by your physiotherapist:</p>
+        </div>
+
+        <div class="text-2xl font-semibold text-gray-900 sm:text-3xl mt-4 mb-2">
+          Input the exercises recommended by your physiotherapist:
+        </div>
+
+        <!--  input text and buttons  -->       
         <textarea id="exercisesInput" rows="4"
           class="w-full border rounded-md p-3 mt-1 resize-y outline-[var(--vehab-blue)]"
           placeholder="e.g., Hamstring Stretch, …"></textarea>
-        <br />
-        <div class="button-row">
+        
+        <div class="button-row flex justify-between items-start mt-4 w-full">
           <button id="askButton"        
-                class="bg-[var(--vehab-blue)] hover:bg-[var(--vehab-blue)]/90
-               text-white font-medium px-4 py-2 rounded-md transition">Get Recommendation</button>
-          <br />
+              class="bg-[var(--vehab-blue)] hover:bg-[var(--vehab-blue)]/20
+                    text-white mt-0 font-medium px-4 py-2 rounded-md transition">Start Exercise</button>
+          
+          <div class="flex flex-col items-end space-y-2 mt-0">
           <div class="file-upload-inline-container">
-              <input type="file" name="pdf_file" id="inlinePdfFileInput" accept=".pdf">
-              <label for="inlinePdfFileInput" class="custom-file-upload">Upload PDF</label>
-              <span id="inlineFileNameDisplay" class="file-name">No file chosen</span>
+            <span id="inlineFileNameDisplay" class="file-name ml-2 text-gray-600">No file chosen</span>
+            <input type="file" name="pdf_file" id="inlinePdfFileInput" accept=".pdf">
+              <label for="inlinePdfFileInput" 
+                    class="bg-[var(--vehab-blue)]/80 hover:bg-[var(--vehab-blue)]/60
+                            text-white font-medium px-4 py-2 rounded-md transition cursor-pointer
+                            inline-block">Upload PDF</label>
           </div>
 
-          <button id="cancelUploadBtn">Cancel Upload</button>    
+          <button id="cancelUploadBtn" class="">Cancel Upload</button>
+          </div>
         </div>
 
+        <p id="inlineUploadStatus" style="margin-top: 0.5rem; font-weight: bold;"></p>
+      
         <div class="exercise-navigation">
           <button id="prevExerciseButton" class="hidden">Previous Exercise</button>
           <span id="exerciseProgress" style="margin: 0 1rem;">Exercise 0 of 0</span>
           <button id="nextExerciseButton" class="hidden">Next Exercise</button>
         </div>
 
-        <p id="inlineUploadStatus" style="margin-top: 0.5rem; font-weight: bold;"></p>
+        
 
         <div id="recommendationResult" style="margin-top: 1rem;">
           <p><strong>Exercise:</strong> <span id="exerciseOutput">N/A</span></p>
@@ -443,6 +494,7 @@
           </div>
         </div>
         <p><strong>Source(s):</strong> <span id="stepSource">N/A</span></p>
+
       </section>
 
 
@@ -482,13 +534,34 @@
           document.querySelectorAll('.tab-content').forEach((tab) => tab.classList.add('hidden'));
           document.getElementById(targetId).classList.remove('hidden');
 
-          document.querySelectorAll('.tab-button').forEach((b) => b.classList.remove('active'));
-          b.dataset.active = 'false';            
+          document.querySelectorAll('.tab-button').forEach((b) => {
+            b.classList.remove('active');
+            b.dataset.active = 'false';
+          });
+
           btn.classList.add('active');
           btn.dataset.active = 'true';
 
           stopWebcam();
         }
+
+        /********************************************
+        * CONFIG BUTTONS
+        *******************************************/
+       // makes leg only appear if not able bodied
+        const prostheticInput = document.getElementById("prostheticInput");
+        const legInput = document.getElementById("legInput");
+
+        prostheticInput.addEventListener("change", function () {
+          const selected = this.value;
+          if (selected !== "able-bodied") {
+            legInput.classList.remove("hidden");
+          } else {
+            legInput.classList.add("hidden");
+            legInput.selectedIndex = 0; // optional: reset leg selection if hidden
+          }
+        });
+
 
         /********************************************
         * MULTI-EXERCISE SUPPORT
@@ -553,7 +626,7 @@
           if (!prosthetic) return alert('Please enter your prosthetic type.');
       
           const leg = document.getElementById('legInput').value.trim();
-          if (!leg) return alert('Please enter the leg side.');
+          if (!leg && prosthetic !== 'able-bodied') return alert('Please enter the leg side.');
 
           // reset UI
           resetUI();

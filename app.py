@@ -9,6 +9,7 @@ import time
 import numpy as np
 import re
 import requests
+import shutil
 '''
     Flask: web framework in Python
         request: access data sent in an HTTP request
@@ -130,7 +131,7 @@ def setup_llm_and_rag(pdf_file_path=None, mode='default_doc'):
     if mode == 'uploaded_pdf': # if user uploads a pdf
         global_mode = mode
         if pdf_file_path and os.path.exists(pdf_file_path): # use pdf instead
-            print(f"Loading uploaded PDF: {pdf_file_path}")
+            #print(f"Loading uploaded PDF: {pdf_file_path}")
             loader = PyPDFLoader(pdf_file_path)
             documents = loader.load()
             for doc in documents:
@@ -157,8 +158,8 @@ def setup_llm_and_rag(pdf_file_path=None, mode='default_doc'):
                             doc.metadata["category"] = mode + prosthetic_type
 
                         documents.extend(loaded_docs)
-                        print(f"Path: \n {pdf_path}")
-                        print(len(documents))
+                        #print(f"Path: \n {pdf_path}")
+                        #print(len(documents))
                     
                     except Exception as e:
                         print(f"Failed to load {pdf_path}: {e}")
@@ -279,7 +280,12 @@ def ask_llm():
     user_leg = request.json.get('leg')
     if not user_leg:
         return jsonify({"error": "No details provided"}), 400
-    user_details = user_prosthetic + user_leg
+    
+    # if able bodied or prosthetic user
+    if user_prosthetic == 'able-bodied':
+        user_details = user_prosthetic
+    else:
+        user_details = user_prosthetic + user_leg
     
     user_exercises = request.json.get('exercises')
     exercise_purpose = ['Strength', 'Mobility', 'Balance', 'Agility'] # needed?
@@ -329,7 +335,7 @@ def ask_llm():
             f"IMPORTANT: only provide ONE VERSION of steps for EACH exercise."
              
             )
-        print(prompt)
+        #print(prompt)
         
         # 3. querry LLM chain via qa_chain (run the RAG process)
         '''
@@ -357,6 +363,7 @@ def ask_llm():
         )
         
         result = qa_chain.invoke({"query": prompt})
+        print(result)
         exercise_recommendation_full_text = result.get("result", "Could not find a suitable exercise.")
         sources = result.get("source_documents", [])
         source_names = list({doc.metadata.get("source", "Unknown document") for doc in sources})
@@ -413,6 +420,7 @@ def ask_llm():
         }
 
         llm_to_vlm = response_data
+        #print(response_data)
         return jsonify(llm_to_vlm)
     
     # fail safe for any error (eg: LLM API failure)
@@ -637,6 +645,8 @@ def analyze_video():
             json=payload,
             timeout=120  # Longer timeout for video processing
         )
+
+        print(response)
         
         # Check if request was successful
         if not response.ok:
