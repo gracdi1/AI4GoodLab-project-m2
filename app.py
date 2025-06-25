@@ -578,8 +578,37 @@ def analyze_video():
                     4. Repeat."""
                     '''
 
-        # define prompt    
+        print('LLM TO VLM: ', llm_to_vlm)
+        # prompt - WITH LIMB AMPUTATION   
         prompt = f""" 
+        You are a physiotherapist reviewing a video of a person performing the exercise: "{llm_to_vlm['exercise']}".
+        
+        Your tasks are:
+            1. Assess whether the person is correctly following these prescribed steps:
+            {llm_to_vlm['steps']}. If any steps are performed incorrectly, please state which steps
+            and provide corrections.
+            2. Identify if the person makes any of these mistakes: {llm_to_vlm['mistake']}. 
+            Make sure to identify incorrect form, posture, and positioning of the body.
+            If any mistakes are made, please state which mistakes and provide corrections.
+        
+        Please highlight if there are any safety concerns or hazards
+        
+        IMPORTANT: Ensure the feedback is specific, concise, and supportive, as if you were
+        coaching the user in person.
+
+        IMPORTANT: This person has this amputation: {llm_to_vlm['user_info']}. The person may or may not be wearing a prosthetic in this video. Make sure 
+        your response is cognizant of this. 
+
+        Please format your response like this:
+
+        Steps done correctly: [Yes/No]
+            Corrections: [N/A if not]
+        Correct form and posture: [Yes/No]
+            Corrections: [N/A if not]
+        """
+        print('LLM TO VLM: ', llm_to_vlm)
+        # prompt - NO LIMB AMPUTATION
+        prompt_no_prosthetic = f""" 
         You are a physiotherapist reviewing a video of a person performing the exercise: "{llm_to_vlm['exercise']}".
         
         Your tasks are:
@@ -597,24 +626,17 @@ def analyze_video():
 
         Please format your response like this:
 
-        Does the user have a amputation? [Yes/No]
-        What is the amputation? 
-        What is the user doing?
-
         Steps done correctly: [Yes/No]
             Corrections: [N/A if not]
         Correct form and posture: [Yes/No]
             Corrections: [N/A if not]
-
-
         """
 
-        # with a limb amputation
-        # IMPORTANT: This person has this amputation: {llm_to_vlm['user_info']} The person may or may not be wearing a prosthetic in this video. Make sure 
-        # your response is cognizant of this.
+        if 'no-prosthetic' in llm_to_vlm['user_info']:
+            prompt = prompt_no_prosthetic
+            print('User: no prosthetic')
 
-
-        print(prompt)
+        print("\n VLM Prompt: ", prompt)
 
         # put into parts for gemini
         parts = [{"text": prompt}]

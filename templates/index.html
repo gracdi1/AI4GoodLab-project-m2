@@ -166,6 +166,7 @@
         border: 1px dashed #007bff;
         border-radius: 0.5rem;
         background: #f0f7ff;
+        width: 100%
       }
       .exercise-steps-container ul {
         padding-left: 1.2rem;
@@ -357,9 +358,9 @@
 
 
       <!--  EXERCISE TAB  -->
-      <section id="exerciseTab" class="tab-content flex flex-col items-center text-center mx-auto w-full max-w-3xl space-y-8">
+      <section id="exerciseTab" class="tab-content flex flex-col items-center mx-auto w-full max-w-3xl space-y-8">
 
-        <div class="text-2xl font-semibold text-gray-900 sm:text-3xl mt-4 mb-2">
+        <div class="text-2xl font-semibold text-gray-900 text-center sm:text-3xl mt-4 mb-2">
           Describe your prosthetic/amputation type to get tailored exercise recommendations.
         </div>
         
@@ -378,7 +379,7 @@
         </select>
         </div>
 
-        <div class="text-2xl font-semibold text-gray-900 sm:text-3xl mt-4 mb-2">
+        <div class="text-2xl font-semibold text-center text-gray-900 sm:text-3xl mt-4 mb-2">
           Input the exercises recommended by your physiotherapist:
         </div>
 
@@ -408,21 +409,20 @@
 
         <p id="inlineUploadStatus" style="margin-top: 0.5rem; font-weight: bold;"></p>
       
-        <div class="exercise-navigation">
-          <button id="prevExerciseButton" class="hidden">Previous Exercise</button>
-          <span id="exerciseProgress" style="margin: 0 1rem;">Exercise 0 of 0</span>
-          <button id="nextExerciseButton" class="hidden">Next Exercise</button>
-        </div>
+        <div id="recommendationResult" class="hidden">
+          <div class="exercise-navigation flex justify-center items-center gap-4">
+            <button id="prevExerciseButton" class="hidden">Previous Exercise</button>
+            <span id="exerciseProgress" class="text-center mx-4">Exercise 0 of 0</span>
+            <button id="nextExerciseButton" class="hidden">Next Exercise</button>
+          </div>
 
-        
-
-        <div id="recommendationResult" style="margin-top: 1rem;">
           <p><strong>Exercise:</strong> <span id="exerciseOutput">N/A</span></p>
-          <p><strong>Prosthetic limb type:</strong> <span id="prostheticOutput">N/A</span></p>
-          <p><strong>Exercise Purpose:</strong> <span id="purposeOutput">N/A</span></p>
+          <!-- <p><strong>Prosthetic limb type:</strong> <span id="prostheticOutput">N/A</span></p> -->
+          <!-- <p><strong>Exercise Purpose:</strong> <span id="purposeOutput">N/A</span></p> -->
           <p><strong>Common Mistakes:</strong> <span id="mistakesOutput">N/A</span></p>
 
-          <div class="exercise-steps-container">
+          <div class="w-full">
+          <div class="exercise-steps-container w-full">
             <h4>Exercise Steps:</h4>
 
             <ul id="exerciseStepsList">
@@ -458,6 +458,9 @@
 
             <div id="videoPreview" class="video-preview"></div>
           </div>
+          </div>
+
+          <p class="mt-4"><strong>Source(s):</strong> <span id="stepSource">N/A</span></p>
 
           <!-- Error messages can appear anytime -->
           <div id="errorMessage" class="error" style="display: none;"></div>
@@ -493,7 +496,6 @@
             </div>
           </div>
         </div>
-        <p><strong>Source(s):</strong> <span id="stepSource">N/A</span></p>
 
       </section>
 
@@ -521,6 +523,14 @@
           frameIntervalId: null,
           processingFrames: false,
         };
+
+        /********************************************
+        * UTILS
+        *******************************************/
+
+        function toggle(id, hidden) {
+          document.getElementById(id).classList[hidden ? 'add' : 'remove']('hidden');
+        }
 
         /********************************************
         * TAB CONTROL
@@ -568,11 +578,11 @@
         let exerciseQueue = [];
         let currentExerciseIndex = 0; 
 
-        function toggle(id, shouldHide) {
-          const el = document.getElementById(id);
-          if (!el) return;
-          el.classList.toggle('hidden', shouldHide);
-        }
+        // function toggle(id, shouldHide) {
+        //   const el = document.getElementById(id);
+        //   if (!el) return;
+        //   el.classList.toggle('hidden', shouldHide);
+        // }
       
         function updateExerciseProgress() {
           const progress = document.getElementById('exerciseProgress');
@@ -581,6 +591,9 @@
         }     
 
         document.getElementById('askButton').addEventListener('click', async () => {
+          // make results container appear
+          toggle('recommendationResult', false)
+
           const exercisesRaw = document.getElementById('exercisesInput').value.trim();
           if (!exercisesRaw) return alert('Please enter your exercises.');
 
@@ -630,8 +643,6 @@
           // reset UI
           resetUI();
           setText('exerciseOutput', 'Thinking...'); // change for demo day
-          setText('prostheticOutput', 'Verifying...'); // change for demo day
-          setText('purposeOutput', 'Analyzing...');
           setText('mistakesOutput', 'Reading...');
           setText('stepSource', 'Loading Source(s)...');
 
@@ -646,8 +657,8 @@
             if (data.error) throw new Error(data.error);
 
             setText('exerciseOutput', data.exercise ?? 'Unknown');
-            setText('prostheticOutput', data.prosthetic ?? 'Unknown');
-            setText('purposeOutput', data.purpose ?? 'Unknown');
+            // setText('prostheticOutput', data.prosthetic ?? 'Unknown');
+            // setText('purposeOutput', data.purpose ?? 'Unknown');
             setText('mistakesOutput', data.mistake ?? 'Unknown');
 
             state.steps = data.steps ?? [];
@@ -663,9 +674,9 @@
           } catch (err) {
             console.error(err);
             setText('exerciseOutput', `Error: ${err.message}`);
-            setText('prostheticOutput', '✖');
-            setText('purposeOutput', '✖');
-            setText('mistakesOutput', '✖');
+            // setText('prostheticOutput', '✖');
+            // setText('purposeOutput', '✖');
+            // setText('mistakesOutput', '✖');
 
             document.getElementById('exerciseStepsList').innerHTML = '<li>Failed to load steps.</li>';
 
