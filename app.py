@@ -90,7 +90,7 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 '''
 
 # --- Global Variables for Exercise State ---
-prosthetic_types = ["transtibial", "transfemoral"]
+prosthetic_types = ["transtibial", "transfemoral", "no-prosthetic"]
 current_exercise_steps = []
 current_exercise_index = 0
 vlm_model = None # To be initialized with gemini-pro-vision
@@ -143,6 +143,7 @@ def setup_llm_and_rag(pdf_file_path=None, mode='default_doc'):
     elif mode == 'default_doc': # if user lists exercises but no pdf
         global_mode = mode
         for prosthetic_type in prosthetic_types:
+            #TODO: CHANGE HERE for no-prosthetic
             pdf_folder = os.path.join("data", prosthetic_type)
             print("Using pdf_folder path:", pdf_folder)
             pdf_paths = [os.path.join(pdf_folder, f) for f in os.listdir(pdf_folder) if f.endswith(".pdf")]
@@ -278,11 +279,11 @@ def ask_llm():
     if not user_prosthetic:
         return jsonify({"error": "No details provided"}), 400
     user_leg = request.json.get('leg')
-    if not user_leg:
+    if ((not user_leg) and (user_prosthetic != "no-prosthetic")):
         return jsonify({"error": "No details provided"}), 400
     
     # if able bodied or prosthetic user
-    if user_prosthetic == 'able-bodied':
+    if user_prosthetic == 'no-prothetic':
         user_details = user_prosthetic
     else:
         user_details = user_prosthetic + user_leg
@@ -349,7 +350,6 @@ def ask_llm():
                 }
             )
         elif global_mode == 'default_doc': # if default mode then have the category = mode + prosthetic
-            print(user_prosthetic)
             retriever = vectorstore.as_retriever(search_kwargs={
                 "filter": {"category": global_mode + user_prosthetic}
                 }
@@ -363,7 +363,7 @@ def ask_llm():
         )
         
         result = qa_chain.invoke({"query": prompt})
-        print(result)
+        print("\n Result: ", result)
         exercise_recommendation_full_text = result.get("result", "Could not find a suitable exercise.")
         sources = result.get("source_documents", [])
         source_names = list({doc.metadata.get("source", "Unknown document") for doc in sources})

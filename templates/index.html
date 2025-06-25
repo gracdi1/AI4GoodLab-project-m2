@@ -368,7 +368,7 @@
           <option value="" disabled selected>Select prosthetic/amputation type</option>
           <option value="transtibial">Transtibial (below knee)</option>
           <option value="transfemoral">Transfemoral (above knee)</option>
-          <option value="able-bodied">I am able bodied</option>
+          <option value="no-prosthetic">I do not have an amputation</option>
         </select>
         <select id="legInput" class="hidden w-full sm:w-auto border rounded-md p-2 mt-2 mb-10 outline-[var(--vehab-blue)]">
           <option value="" disabled selected>Select right or left leg</option>
@@ -500,8 +500,7 @@
 
       <!--  SECOND TAB  -->
       <section id="recommendTab" class="tab-content hidden">
-        <h2>Get Recommendations</h2>
-        <p>Get basic exercises based on recovery timeline, skill, and prosthetic type</p>
+        <h2>In development.</h2>
       </section>
 
       <!--  SCRIPT AREA  -->
@@ -548,13 +547,13 @@
         /********************************************
         * CONFIG BUTTONS
         *******************************************/
-       // makes leg only appear if not able bodied
+       // makes leg only appear if prosthetic 
         const prostheticInput = document.getElementById("prostheticInput");
         const legInput = document.getElementById("legInput");
 
         prostheticInput.addEventListener("change", function () {
           const selected = this.value;
-          if (selected !== "able-bodied") {
+          if (selected !== "no-prosthetic") {
             legInput.classList.remove("hidden");
           } else {
             legInput.classList.add("hidden");
@@ -626,7 +625,7 @@
           if (!prosthetic) return alert('Please enter your prosthetic type.');
       
           const leg = document.getElementById('legInput').value.trim();
-          if (!leg && prosthetic !== 'able-bodied') return alert('Please enter the leg side.');
+          if (!leg && prosthetic !== 'no-prosthetic') return alert('Please enter the leg side.');
 
           // reset UI
           resetUI();
