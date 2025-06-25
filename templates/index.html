@@ -287,8 +287,9 @@
       </p>
 
       <button id="enterAppBtn"
-              class="bg-[var(--vehab-blue)] hover:bg-[var(--vehab-blue)]/90
-                    text-white font-medium px-6 py-3 rounded-md transition">
+              class="bg-[var(--vehab-blue)] text-white font-medium px-6 py-3 rounded-md
+                    transition opacity-40 cursor-not-allowed" 
+              disabled>
         Get&nbsp;Started
       </button>
 
@@ -305,6 +306,14 @@
         If at any point while following these suggestions you feel pain or risk
         of injury, stop immediately and consult your physiotherapist.
       </p>
+
+            <!-- ✍ acknowledgement checkbox -->
+      <label for="disclaimerCheck"
+            class="flex items-center gap-2 text-xs sm:text-sm font-semibold text-gray-600">
+        <input id="disclaimerCheck" type="checkbox"
+              class="h-4 w-4 accent-[var(--vehab-blue)] cursor-pointer" />
+        I understand
+      </label>
     </div>
 
     <div id="appScreen" class="hidden">
@@ -1163,6 +1172,23 @@
               console.log("No uploaded file to remove.");
             }
           });
+        });
+
+          document.addEventListener('DOMContentLoaded', () => {
+
+          const chk   = document.getElementById('disclaimerCheck');
+          const start = document.getElementById('enterAppBtn');
+
+          // toggle button state / styling
+          function updateBtn() {
+            const enabled = chk.checked;
+            start.disabled = !enabled;
+            start.classList.toggle('opacity-40', !enabled);
+            start.classList.toggle('cursor-not-allowed', !enabled);
+          }
+
+          chk.addEventListener('change', updateBtn);
+          updateBtn();            // initialise on page load
         });
 
         /********************************************
