@@ -620,7 +620,8 @@ def analyze_video():
 
         # prompt - WITH LIMB AMPUTATION   
         prompt = f""" 
-        You are a physiotherapist reviewing a video of a person performing the exercise: "{llm_to_vlm['exercise']}".
+        You are a physiotherapist reviewing a video of a person with this amputation: {llm_to_vlm['user_info']}, performing the exercise: "{llm_to_vlm['exercise']}".
+        The person may or may not be wearing a prosthetic in this video.
         
         Your tasks are:
             1. Assess whether the person is correctly following these prescribed steps:
@@ -630,13 +631,10 @@ def analyze_video():
             Make sure to identify incorrect form, posture, and positioning of the body.
             If any mistakes are made, please state which mistakes and provide corrections.
         
-        Please highlight if there are any safety concerns or hazards
+        Please highlight if there are any safety concerns or hazards.
         
         IMPORTANT: Ensure the feedback is specific, concise, and supportive, as if you were
         coaching the user in person.
-
-        IMPORTANT: This person has this amputation: {llm_to_vlm['user_info']}. The person may or may not be wearing a prosthetic in this video. Make sure 
-        your response is cognizant of this. 
 
         Please format your response like this:
 
