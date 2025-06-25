@@ -321,18 +321,16 @@
     <header
       class="flex flex-col sm:flex-row items-center sm:justify-between gap-4
             pt-4 pb-6 sm:py-8">
-      <img src="{{ url_for('static', filename='assets/vehab-logo.png') }}" alt="VEHAB logo"
-          class="h-16 w-auto" />
+      <!-- CLICKABLE LOGO -->
+      <img id="logoHome"
+          src="{{ url_for('static', filename='assets/vehab-logo.png') }}"
+          alt="VEHAB logo"
+          class="h-16 w-auto cursor-pointer" />
 
       <p class="text-sm sm:text-base font-light text-gray-600 tracking-wide"
         style="font-family:'Inter',sans-serif">
         Your&nbsp;Virtual&nbsp;AI&nbsp;Prosthetic&nbsp;Rehab&nbsp;Assistant
       </p>
-            <!-- add inside your sticky header, right-aligned -->
-      <button id="homeBtn"
-              class="text-sm text-gray-500 hover:text-[var(--vehab-orange)] transition hidden">
-        Home
-      </button>
 
     </header>
 
@@ -1190,6 +1188,30 @@
           chk.addEventListener('change', updateBtn);
           updateBtn();            // initialise on page load
         });
+
+        document.addEventListener('DOMContentLoaded', () => {
+
+        const logoHome   = document.getElementById('logoHome');
+        const homeScreen = document.getElementById('homeScreen');
+        const appScreen  = document.getElementById('appScreen');
+
+        function goHome() {
+          appScreen.classList.add('hidden');
+          homeScreen.classList.remove('hidden');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+
+          // optional clean-up so the next session starts fresh
+          resetUI();                                     // you already have this helper
+          document.getElementById('exercisesInput').value = '';
+          document.getElementById('prostheticInput').selectedIndex = 0;
+          const leg = document.getElementById('legInput');
+          leg.classList.add('hidden'); leg.selectedIndex = 0;
+          toggle('recommendationResult', true);
+        }
+
+        logoHome.addEventListener('click', goHome);
+      });
+
 
         /********************************************
         * UTILS
