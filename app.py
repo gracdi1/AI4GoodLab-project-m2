@@ -283,7 +283,7 @@ def ask_llm():
         return jsonify({"error": "No details provided"}), 400
     
     # if able bodied or prosthetic user
-    if user_prosthetic == 'no-prothetic':
+    if user_prosthetic == 'no-prosthetic':
         user_details = user_prosthetic
     else:
         user_details = user_prosthetic + user_leg
@@ -336,7 +336,47 @@ def ask_llm():
             f"IMPORTANT: only provide ONE VERSION of steps for EACH exercise."
              
             )
-        #print(prompt)
+        
+        prompt_no_prosthetic = (
+            f"You are a virtual rehabilitation assistant "
+            f"to help guide users through their rehabilitation exercises. "
+            f"Given the following exercise(s): {user_exercises}" 
+            f"use the provided documents to find step-by-step instructions for each exercise."
+
+            f"IMPORTANT INSTRUCTIONS:\n"
+            f"1. Only provide ONE VERSION of steps for each exercise.\n"
+            f"2. If multiple descriptions exist, merge them into one clean and non-redundant step-by-step list,"
+            f"   avoiding duplicated or alternative step formats. Do NOT list both versions."
+            f"3. ONLY IF the exercise(s) inputted by the user are NOT found, suggest the closest alternative from the documents.\n"
+            f"4. For EACH exercise, include:\n"
+            f"   - Prosthetic limb type(s) that use this exercise\n"
+            f"   - The purpose (choose from {exercise_purpose})\n"
+            f"   - commmon mistakes that individuals make when performing the exercises\n"
+            f"   - Clear step-by-step instructions\n"
+            f"5. If nothing relevant is found, please use general knowledge.\n"
+
+            f"Please format your response like this:\n\n"
+
+            f"Exercise: [Name of Exercise]\n"
+            f"Prosthetic limb type(s): [e.g., transfemoral, transtibial]\n"
+            f"Purpose: [e.g., Balance, Mobility]\n"
+            f"Common mistakes: [Common mistakes that individuals make]\n"
+            f"Steps:\n"
+            f"1. [Step one]\n"
+            f"2. [Step two]\n"
+            f"...\n\n"
+
+            f"IMPORTANT: only provide ONE VERSION of steps for EACH exercise."
+             
+            )
+
+        print(user_prosthetic)
+        # use no prosthetic prompt if needed
+        if user_prosthetic == 'no-prosthetic':
+            prompt = prompt_no_prosthetic
+            print('User: no prosthetic (LLM)')
+
+        print("\n LLM Prompt: ", prompt)
         
         # 3. querry LLM chain via qa_chain (run the RAG process)
         '''
@@ -578,7 +618,6 @@ def analyze_video():
                     4. Repeat."""
                     '''
 
-        print('LLM TO VLM: ', llm_to_vlm)
         # prompt - WITH LIMB AMPUTATION   
         prompt = f""" 
         You are a physiotherapist reviewing a video of a person performing the exercise: "{llm_to_vlm['exercise']}".
@@ -606,7 +645,7 @@ def analyze_video():
         Correct form and posture: [Yes/No]
             Corrections: [N/A if not]
         """
-        print('LLM TO VLM: ', llm_to_vlm)
+        
         # prompt - NO LIMB AMPUTATION
         prompt_no_prosthetic = f""" 
         You are a physiotherapist reviewing a video of a person performing the exercise: "{llm_to_vlm['exercise']}".
@@ -634,7 +673,7 @@ def analyze_video():
 
         if 'no-prosthetic' in llm_to_vlm['user_info']:
             prompt = prompt_no_prosthetic
-            print('User: no prosthetic')
+            print('User: no prosthetic (VLM)')
 
         print("\n VLM Prompt: ", prompt)
 
