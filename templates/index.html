@@ -95,7 +95,7 @@
         border: 1px solid #ccc;
         border-radius: 0.25rem;
       }
-      button {
+      /* button {
         padding: 0.6rem 1rem;
         border: none;
         border-radius: 0.25rem;
@@ -107,17 +107,18 @@
       }
       button:hover {
         background: #214aff;
-      }
+      } */
       button.secondary {
-        background: #6c757d;
+        background: #98b8d3;
+        padding: 0.3rem 0.3rem;
       }
       button.secondary:hover {
-        background: #5b636b;
+        background: #4594e3;
       }
-      button:disabled {
+      /* button:disabled {
         background: #b6b6b6;
         cursor: not-allowed;
-      }
+      } */
 
       /* Styles for the file upload input (adjusted for inline use) */
       /* .file-upload-inline-container {
@@ -160,7 +161,7 @@
       } */
 
       /* -----------  EXERCISE AREA  ----------- */
-      .exercise-steps-container {
+      /* .exercise-steps-container {
         margin-top: 1rem;
         padding: 1rem;
         border: 1px dashed #007bff;
@@ -170,7 +171,7 @@
       }
       .exercise-steps-container ul {
         padding-left: 1.2rem;
-      }
+      } */
       #webcam-container {
         margin-top: 1.5rem;
         text-align: center;
@@ -225,7 +226,7 @@
       }
 
       /* Video analysis container */
-      #video-analysis-container {
+      /* #video-analysis-container {
         display: none;
         margin-top: 2rem;
         padding: 1.5rem;
@@ -250,7 +251,7 @@
         max-width: 400px;
         border-radius: 0.5rem;
         box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      }
+      } */
 
       .analysis-feedback {
         flex: 1;
@@ -288,7 +289,7 @@
 
       <button id="enterAppBtn"
               class="bg-[var(--vehab-blue)] text-white font-medium px-6 py-3 rounded-md
-                    transition opacity-40 cursor-not-allowed" 
+                    transition hover:bg-blue-500 opacity-40 cursor-not-allowed" 
               disabled>
         Get&nbsp;Started
       </button>
@@ -339,11 +340,11 @@
 
       <!--  TAB CONTROLS  -->
     <div class="flex justify-center mt-4">
-      <div class="inline-flex divide-x divide-gray-300 overflow-hidden rounded border border-gray-300 bg-white shadow-sm">
+      <div class="inline-flex divide-x divide-gray-300 overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm">
         <button
           type="button"
-          class="tab-button px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors 
-          data-[active=true]:bg-var[(--vehab-blue-rgb), 0.2] data-[active=true]:text-gray-900 hover:bg-gray-50 hover:text-gray-900 focus:relative"
+          class="tab-button px-3 py-1.5 text-lg font-medium text-gray-700 transition-colors 
+          data-[active=true]:bg-var[(--vehab-blue-rgb), 0.2] data-[active=true]:text-white hover:bg-gray-200 hover:text-gray-900 focus:relative"
           data-target="exerciseTab"
           data-active="true"
         >
@@ -352,8 +353,8 @@
 
         <button
           type="button"
-          class="tab-button px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors 
-          data-[active=true]:bg-var[(--vehab-blue-rgb), 0.2] data-[active=true]:text-gray-900 hover:bg-gray-50 hover:text-gray-900 focus:relative"
+          class="tab-button px-3 py-1.5 text-lg font-medium text-gray-700 transition-colors 
+          data-[active=true]:bg-var[(--vehab-blue-rgb), 0.2] data-[active=true]:text-white hover:bg-gray-200 hover:text-gray-900 focus:relative"
           data-target="recommendTab"
           data-active="false"
         >
@@ -363,36 +364,21 @@
     </div>
 
 
-
-      <!-- <div class="flex gap-2">
-        <button class="tab-button px-4 py-2 rounded-t-lg bg-[var(--vehab-orange)]/40
-                      transition-colors data-[active=true]:bg-[var(--vehab-orange)]"
-                data-target="exerciseTab" data-active="true">
-          Exercise
-        </button>
-
-        <button class="tab-button px-4 py-2 rounded-t-lg bg-[var(--vehab-orange)]/40
-                      transition-colors" data-target="recommendTab">
-          Get Recommendations
-        </button>
-      </div> -->
-
-
       <!--  EXERCISE TAB  -->
       <section id="exerciseTab" class="tab-content flex flex-col items-center mx-auto w-full max-w-3xl space-y-8">
 
-        <div class="text-2xl font-semibold text-gray-900 text-center sm:text-3xl mt-4 mb-2">
+        <div class="text-2xl font-semibold text-gray-900 text-center sm:text-3xl mt-4">
           Describe your prosthetic/amputation type to get tailored exercise recommendations.
         </div>
         
         <div class="flex flex-row"> 
-        <select id="prostheticInput" class="w-full sm:w-auto border rounded-md p-2 mt-2 mb-10 outline-[var(--vehab-blue)]">
+        <select id="prostheticInput" class="w-full sm:w-auto border text-lg rounded-lg p-2 mt-2 mb-8 outline-[var(--vehab-blue)]">
           <option value="" disabled selected>Select prosthetic/amputation type</option>
           <option value="transtibial">Transtibial (below knee)</option>
           <option value="transfemoral">Transfemoral (above knee)</option>
           <option value="no-prosthetic">I do not have an amputation</option>
         </select>
-        <select id="legInput" class="hidden w-full sm:w-auto border rounded-md p-2 mt-2 mb-10 outline-[var(--vehab-blue)]">
+        <select id="legInput" class="hidden w-full sm:w-auto border text-lg rounded-lg p-2 mt-2 mb-10 outline-[var(--vehab-blue)]">
           <option value="" disabled selected>Select right or left leg</option>
           <option value="right">Right leg</option>
           <option value="left">Left leg</option>
@@ -406,12 +392,12 @@
 
         <!--  input text and buttons  -->       
         <textarea id="exercisesInput" rows="4"
-          class="w-full border rounded-md p-3 mt-1 resize-y outline-[var(--vehab-blue)]"
+          class="w-full mx-auto border rounded-md p-3 mt-1 resize-y outline-[var(--vehab-blue)]"
           placeholder="e.g., Hamstring Stretch, …"></textarea>
         
         <div class="button-row flex justify-between items-start mt-4 w-full">
           <button id="askButton"        
-              class="bg-[var(--vehab-blue)] hover:bg-[var(--vehab-blue)]/20
+              class="bg-[var(--vehab-blue)] hover:bg-blue-500
                     text-white mt-0 font-medium px-4 py-2 rounded-md transition">Start Exercise</button>
           
           <div class="flex flex-col items-end space-y-2 mt-0">
@@ -419,7 +405,7 @@
             <span id="inlineFileNameDisplay" class="file-name ml-2 text-gray-600">No file chosen</span>
             <input type="file" name="pdf_file" id="inlinePdfFileInput" accept=".pdf">
               <label for="inlinePdfFileInput" 
-                    class="bg-[var(--vehab-blue)]/80 hover:bg-[var(--vehab-blue)]/60
+                    class="bg-[var(--vehab-blue)]/80 hover:bg-blue-500
                             text-white font-medium px-4 py-2 rounded-md transition cursor-pointer
                             inline-block">Upload PDF</label>
           </div>
@@ -431,26 +417,30 @@
         <p id="inlineUploadStatus" style="margin-top: 0.5rem; font-weight: bold;"></p>
       
         <div id="recommendationResult" class="hidden">
+
           <div class="exercise-navigation flex justify-center items-center gap-4">
             <button id="prevExerciseButton" class="hidden">Previous Exercise</button>
             <span id="exerciseProgress" class="text-center mx-4">Exercise 0 of 0</span>
             <button id="nextExerciseButton" class="hidden">Next Exercise</button>
-          </div>
+            </div> 
 
-          <p><strong>Exercise:</strong> <span id="exerciseOutput">N/A</span></p>
+          <!-- <p><strong>Exercise:</strong> </p> -->
           <!-- <p><strong>Prosthetic limb type:</strong> <span id="prostheticOutput">N/A</span></p> -->
           <!-- <p><strong>Exercise Purpose:</strong> <span id="purposeOutput">N/A</span></p> -->
-          <p><strong>Common Mistakes:</strong> <span id="mistakesOutput">N/A</span></p>
 
-          <div class="w-full">
-          <div class="exercise-steps-container w-full">
-            <h4>Exercise Steps:</h4>
+          
+          <div class="exercise-steps-container w-full mx-auto rounded-xl bg-blue-100 p-4 sm:p-6 lg:p-8 mt-8">
+          <div class="box w-full flex flex-col gap-4">          
+            
+            <div class="text-2xl text-center mb-4 font-semibold">Exercise Steps: <span id="exerciseOutput">N/A</span> </div> 
 
-            <ul id="exerciseStepsList">
+            <ul id="exerciseStepsList" class="text-lg">
               <li>Steps will appear here.</li>
             </ul>
 
-            <div class="speech-controls" style="margin-top: 1rem;">
+            <div class="font-semibold text-lg">Common Mistakes: <span id="mistakesOutput" class="font-normal">N/A</span></div>
+            
+            <div class="speech-controls flex flex-col items-center">
               <label for="voiceSelect"><strong>Choose Voice:</strong></label>
               <select id="voiceSelect"></select>
             
@@ -459,7 +449,7 @@
                 <input type="range" id="rateSlider" min="0.5" max="2" value="1" step="0.1" />
               </div>
             
-              <div style="margin-top: 1rem;">
+              <div class="mb-2">
                 <button id="readStepsButton" class="secondary">Read Steps</button>
                 <button id="pauseButton" class="secondary">⏸ Pause</button>
                 <button id="resumeButton" class="secondary">▶ Resume</button>
@@ -468,20 +458,32 @@
             </div>         
 
             <div class="button-group">
-              <button id="startExerciseButton" class="hidden">Start Exercise with VLM</button>
-              <button id="uploadVideoButton" class="hidden">Upload Video</button>
-              <input type="file" id="videoFileInput" accept="video/*" style="display: none;">
-              <button id="analyzeVideoButton" class="hidden">Analyze Video</button>
               <button id="nextStepButton" class="hidden secondary">Next Step</button>
               <button id="finishExerciseButton" class="hidden secondary">Finish Exercise</button>
             </div>
-            <p id="videoUploadStatus" style="margin-top: 0.5rem; font-weight: bold; color: green;"></p>
-
-            <div id="videoPreview" class="video-preview"></div>
+            </div>
+            
           </div>
+          <p class="mt-4 text-center"><strong>Source(s):</strong> <span id="stepSource">N/A</span></p>
+
+          
+          
+          <div class="text-2xl font-semibold text-center text-gray-900 sm:text-3xl mt-10 mb-4">
+          Get form correcting feedback:
           </div>
 
-          <p class="mt-4"><strong>Source(s):</strong> <span id="stepSource">N/A</span></p>
+          <div class="flex flex-row items-center justify-center">
+          <input type="file" id="videoFileInput" accept="video/*" style="display: none;">
+          <button id="uploadVideoButton" class="hidden bg-[var(--vehab-blue)] hover:bg-blue-500
+                  text-white mt-2 mr-2 font-medium px-4 py-2 rounded-md transition">Upload Video</button>
+          <button id="analyzeVideoButton" disabled class="bg-[var(--vehab-blue)] hover:bg-blue-500
+                  text-white mt-2 ml-2 font-medium px-4 py-2 rounded-md transition disabled:bg-gray-400 disabled:cursor-not-allowed">Analyze Video</button>
+          </div>
+          <p id="videoUploadStatus" class="text-center font-semibold mt-1"></p>
+      
+        </div>
+
+             
 
           <!-- Error messages can appear anytime -->
           <div id="errorMessage" class="error" style="display: none;"></div>
@@ -505,15 +507,18 @@
         </div>
 
         <!-- Video Analysis Container -->
-        <div id="video-analysis-container">
-          <div class="video-display">
-            <h3>Uploaded Video</h3>
-            <video id="analysis-video" controls></video>
-          </div>
-          <div class="analysis-feedback">
-            <h3>Analysis</h3>
-            <div id="analysis-content">
-              <span class="analyzing-spinner">⟳</span> Analyzing video...
+        <!-- Video Analysis Container -->
+        <div id="video-analysis-container" class="hidden mt-8 p-6 border border-gray-300 rounded-lg bg-white w-full max-w-3xl mx-auto">
+          <div class="flex gap-8 flex-col items-center justify-center">
+            <div class="video-display flex-1 min-w-0 flex flex-col justify-center items-center">
+              <div class="text-center mb-2 font-semibold text-lg">Uploaded Video</div>
+              <video id="analysis-video" controls class="w-full max-w-md rounded-lg shadow-md"></video>
+            </div>
+            <div class="analysis-feedback flex-1 p-4 bg-blue-300 rounded-lg border border-var(--vehab-blue)">
+              <div class="text-center mb-2 font-semibold text-xl">Analysis</div>
+              <div id="analysis-content" class="text-lg">
+                <span class="analyzing-spinner">⟳</span> Analyzing video...
+              </div>
             </div>
           </div>
         </div>
@@ -663,8 +668,8 @@
 
           // reset UI
           resetUI();
-          setText('exerciseOutput', 'Thinking...'); // change for demo day
-          setText('mistakesOutput', 'Reading...');
+          setText('exerciseOutput', '...'); // change for demo day
+          setText('mistakesOutput', '...');
           setText('stepSource', 'Loading Source(s)...');
 
           try {
@@ -689,7 +694,6 @@
             const sources = data.sources && data.sources.length > 0 ? data.sources.join(', ') : "Unknown";
             document.getElementById("stepSource").innerText = sources;
 
-            toggle('startExerciseButton', false);
             toggle('uploadVideoButton', false);
 
           } catch (err) {
@@ -735,11 +739,6 @@
           state.steps.forEach((step, idx) => {
             const li = document.createElement('li');
             li.textContent = step;
-            if (idx === state.currentStep) {
-              li.style.fontWeight = 'bold';
-              li.style.color = '#007bff';
-              li.style.background = '#e6f3ff';
-            }
             list.appendChild(li);
           });
           setText('currentStepDisplay', state.steps[state.currentStep] ?? 'N/A');
@@ -845,11 +844,12 @@
           if (e.target.files.length > 0) {
             const fileName = e.target.files[0].name;
             const videoFile = e.target.files[0];
+            const analyzeBtn = document.getElementById('analyzeVideoButton');
 
             console.log('File selected:', fileName);
 
             // show analyze video button
-            document.getElementById('analyzeVideoButton').classList.remove('hidden');
+            analyzeBtn.disabled = false;
         
             // show success message
             statusEl.innerHTML = `<span style="color: green;"><strong>${fileName}</strong> uploaded successfully!</span>`;
@@ -900,7 +900,7 @@
           const container = document.getElementById('video-analysis-container');
           const analysisContent = document.getElementById('analysis-content');
           // Show container and reset feedback content
-          container.classList.add('show');
+          container.classList.remove('hidden');
           analysisContent.innerHTML = '<span class="analyzing-spinner">⟳</span> Analyzing video...';
 
           try {
@@ -954,7 +954,6 @@
         /********************************************
         * WEBCAM MANAGEMENT
         *******************************************/
-        document.getElementById('startExerciseButton').addEventListener('click', startExercise);
         document.getElementById('nextStepButton').addEventListener('click', nextStep);
         document.getElementById('finishExerciseButton').addEventListener('click', finishExercise);
         document.getElementById('stopWebcamButton').addEventListener('click', stopWebcam);
@@ -998,7 +997,6 @@
           const ok = await startWebcam();
           if (!ok) return;
 
-          toggle('startExerciseButton', true);
           toggle('nextStepButton', false);
           toggle('finishExerciseButton', false);
 
@@ -1068,7 +1066,7 @@
         function finishExercise() {
           stopFrameProcessing();
           stopWebcam();
-          toggle('startExerciseButton', false);
+        
           toggle('nextStepButton', true);
           toggle('finishExerciseButton', true);
           setText('vlmFeedbackOutput', 'Exercise session ended.');
@@ -1225,7 +1223,7 @@
         function resetUI() {
           stopWebcam();
           stopFrameProcessing();
-          toggle('startExerciseButton', true);
+          
           toggle('nextStepButton', true);
           toggle('finishExerciseButton', true);
           setText('currentStepDisplay', 'N/A');
