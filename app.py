@@ -320,7 +320,7 @@ def ask_llm():
             f"   - The purpose (choose from {exercise_purpose})\n"
             f"   - commmon mistakes that individuals make when performing the exercises\n"
             f"   - Clear step-by-step instructions\n"
-            f"5. If nothing relevant is found, please use general knowledge.\n"
+            f"5. If nothing relevant is found, say 'exercise not found in documentation'.\n"
 
             f"Please format your response like this:\n\n"
 
@@ -340,7 +340,7 @@ def ask_llm():
         prompt_no_prosthetic = (
             f"You are a virtual rehabilitation assistant "
             f"to help guide users through their rehabilitation exercises. "
-            f"Given the following exercise(s): {user_exercises}" 
+            f"Given the following exercise(s): {user_exercises} " 
             f"use the provided documents to find step-by-step instructions for each exercise."
 
             f"IMPORTANT INSTRUCTIONS:\n"
@@ -353,7 +353,7 @@ def ask_llm():
             f"   - The purpose (choose from {exercise_purpose})\n"
             f"   - commmon mistakes that individuals make when performing the exercises\n"
             f"   - Clear step-by-step instructions\n"
-            f"5. If nothing relevant is found, please use general knowledge.\n"
+            f"5. If nothing relevant is found, say 'exercise not found in documentation'.\n"
 
             f"Please format your response like this:\n\n"
 
