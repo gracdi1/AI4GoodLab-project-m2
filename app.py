@@ -48,35 +48,8 @@ from langchain_google_genai import GoogleGenerativeAI # For text-only initial re
 from langchain_google_genai import ChatGoogleGenerativeAI # Often better for multimodal and conversational
 # For processing frames with Vision model
 from langchain_core.messages import HumanMessage
-'''
-    this block is needed to build a RAG system with Gemini inside a Flask app
-        LangChain for RAG (Retrieval-Augmented Generation): connect LLMs to external data (PDFs, dbs, docs) + querying that data
-    Chroma: vector store; save and search docs based on semantic embedding
-    PyPDFLoader: load PDF file and split it into pages or chunks as docs so LC can process
-    RecCharTSp: splits long text into smaller overlapping chunks (recursively splitting)
-    RetrievalQA: user question -> search relevant docs -> LLM answers using those docs
-    GoogGenAI: instantiates text-only Google LLM 
-    ChatGoogGenAI: chat-based Google LLM 
-    HumanMessage: used when interacting with chat model (how you send a message from user into the chat)
-        AIMessage is used for the model's response
-        we are capturing video frames (and encoding them) -> sending them to a Vision model (Gemini)
-        instead of the human chatting, it has a VIDEO response
-'''
 
 app = Flask(__name__) # create Flask app instance, which will be used later to define routes
-'''
-    What is Flask? a Python web framework that lets you turn Python code into a web app
-        API (Application Programming Interface): a way for different softwar programs to talk to each other
-            the rules, formats, and endpoints that different programs use
-            API client: an individual software program
-            our Flask app's API endpoint: a special URL route
-        Recap of HTTP methods: GET (request), POST (send), PUT (update), DELETE (remove)
-    What does Flask do? runs a web server, maps URLs to functions, sends back responses
-        overall: builds routes, handle requests, and return responses
-    What is a Flask app instance? a Flask application object (called app)
-        acts as the central registry for your routes
-        keeps track of configuration settings + starts the server when you run it
-'''
 
 # --- Configure Google Gemini API Key ---
 if os.getenv("GOOGLE_API_KEY") is None:
@@ -96,9 +69,6 @@ current_exercise_index = 0
 vlm_model = None # To be initialized with gemini-pro-vision
 llm_to_vlm = None
 global_mode = None
-'''
-    initialize variables that will be used for the step-by-step instructions feature
-'''
 
 # --- RAG Setup (Load PDFs and Create Vector Store) ---
 vectorstore = None # store vector database (from contents of PDFs) + search for info
@@ -171,11 +141,6 @@ def setup_llm_and_rag(pdf_file_path=None, mode='default_doc'):
         print("Unknown mode or missing PDF.")
         return False
     
-    ''' 
-        loads booklet as a list of pages 
-        each page is a separate Document obj
-    '''
-    
     # split and embed documents based on mode
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     texts = []
@@ -224,7 +189,6 @@ def remove_pdf():
     global global_mode
     data = request.get_json()
     filename = data.get('filename')
-    user_prosthetic = data.get('user_prosthetic')
 
     print("Received request to remove PDF")
 
@@ -261,19 +225,12 @@ def index():
     return render_template('index.html')
 
 # main function: POST reqs, take in user prompt, queries RAG, parses LLM output
-'''
-    Frontend -> POST /ask_llm -> Flask backend -> build prompt -> qa_chain (RAG)
-    -> LLM -> parse response (steps + supervision) -> return JSON -> Frontend
-'''
+
 @app.route('/ask_llm', methods=['POST'])
 def ask_llm():
     global current_exercise_steps, current_exercise_index, global_mode # Use globals
 
     # 1. get symptoms input -> change to get exercises/type of prosthetic
-    ''' 
-        when a client sends a POST request to the Flask route (/ask_llm) the data 
-        must be in JSON format and must contain a key called "symptoms" 
-    '''
     
     user_prosthetic = request.json.get('prosthetic')
     if not user_prosthetic:
@@ -294,81 +251,68 @@ def ask_llm():
         return jsonify({"error": "No exercises provided"}), 400
 
     # 2. build the prompt: instructs the LLM what to do 
-    ''' 
-        - retrieve relevant exercises froms doc based on user's provided names of exercises 
-        - explain the exercise + include common errors
-
-        still need to add: 
-        - state how to position selves in front of camera
-        - add feedback option (provide alternatives) ?
-    '''
     try:
-        prompt = (
-            f"You are a virtual rehabilitation assistant "
-            f"to help guide users with lower limb prosthetics through their rehabilitation exercises. "
-            f"Given the following exercise(s): {user_exercises} and"
-            f"the user's type and location of prosthetic: {user_details}, " 
-            f"use the provided documents to find step-by-step instructions for each exercise."
+        prompt = (f"""
+            You are a virtual rehabilitation assistant to help guide users with lower limb prosthetics through their rehabilitation exercises.
+            Given the following exercise(s): {user_exercises} and the user's type and location of 
+            prosthetic: {user_details}, use the provided documents to find step-by-step instructions for each exercise.
 
-            f"IMPORTANT INSTRUCTIONS:\n"
-            f"1. Only provide ONE VERSION of steps for each exercise.\n"
-            f"2. If multiple descriptions exist, merge them into one clean and non-redundant step-by-step list,"
-            f"   avoiding duplicated or alternative step formats. Do NOT list both versions."
-            f"3. ONLY IF the exercise(s) inputted by the user are NOT found, suggest the closest alternative from the documents.\n"
-            f"4. For EACH exercise, include:\n"
-            f"   - Prosthetic limb type(s) that use this exercise\n"
-            f"   - The purpose (choose from {exercise_purpose})\n"
-            f"   - commmon mistakes that individuals make when performing the exercises\n"
-            f"   - Clear step-by-step instructions\n"
-            f"5. If nothing relevant is found, say 'exercise not found in documentation'.\n"
+            IMPORTANT INSTRUCTIONS:\n
+            1. Only provide ONE VERSION of steps for each exercise.
+            2. If multiple descriptions exist, merge them into one clean and non-redundant step-by-step list,
+               avoiding duplicated or alternative step formats. Do NOT list both versions."
+            3. ONLY IF the exercise(s) inputted by the user are NOT found, suggest the closest alternative from the documents.
+            4. For EACH exercise, include:
+               - Prosthetic limb type(s) that use this exercise
+               - The purpose (choose from {exercise_purpose})
+               - commmon mistakes that individuals make when performing the exercises
+               - Clear step-by-step instructions
+            5. If nothing relevant is found, say 'exercise not found in documentation'.
 
-            f"Please format your response like this:\n\n"
+            Please format your response like this:
+            Exercise: [Name of Exercise]
+            Prosthetic limb type(s): [e.g., transfemoral, transtibial]
+            Purpose: [e.g., Balance, Mobility]
+            Common mistakes: [Common mistakes that individuals make]
+            Steps:
+            1. [Step one]
+            2. [Step two]
+            ...
 
-            f"Exercise: [Name of Exercise]\n"
-            f"Prosthetic limb type(s): [e.g., transfemoral, transtibial]\n"
-            f"Purpose: [e.g., Balance, Mobility]\n"
-            f"Common mistakes: [Common mistakes that individuals make]\n"
-            f"Steps:\n"
-            f"1. [Step one]\n"
-            f"2. [Step two]\n"
-            f"...\n\n"
-
-            f"IMPORTANT: only provide ONE VERSION of steps for EACH exercise."
+            IMPORTANT: only provide ONE VERSION of steps for EACH exercise.
              
-            )
+            """)
         
-        prompt_no_prosthetic = (
-            f"You are a virtual rehabilitation assistant "
-            f"to help guide users through their rehabilitation exercises. "
-            f"Given the following exercise(s): {user_exercises} " 
-            f"use the provided documents to find step-by-step instructions for each exercise."
+        prompt_no_prosthetic = (f"""
+            You are a virtual rehabilitation assistant to help guide users through their rehabilitation exercises.
+            Given the following exercise(s): {user_exercises} and the user's type and location of 
+            prosthetic: {user_details}, use the provided documents to find step-by-step instructions for each exercise.
 
-            f"IMPORTANT INSTRUCTIONS:\n"
-            f"1. Only provide ONE VERSION of steps for each exercise.\n"
-            f"2. If multiple descriptions exist, merge them into one clean and non-redundant step-by-step list,"
-            f"   avoiding duplicated or alternative step formats. Do NOT list both versions."
-            f"3. ONLY IF the exercise(s) inputted by the user are NOT found, suggest the closest alternative from the documents.\n"
-            f"4. For EACH exercise, include:\n"
-            f"   - Prosthetic limb type(s) that use this exercise\n"
-            f"   - The purpose (choose from {exercise_purpose})\n"
-            f"   - commmon mistakes that individuals make when performing the exercises.\n"
-            f"   - Clear step-by-step instructions\n"
-            f"5. If nothing relevant is found, say 'exercise not found in documentation'.\n"
+            IMPORTANT INSTRUCTIONS:\n
+            1. Only provide ONE VERSION of steps for each exercise.
+            2. If multiple descriptions exist, merge them into one clean and non-redundant step-by-step list,
+               avoiding duplicated or alternative step formats. Do NOT list both versions."
+            3. ONLY IF the exercise(s) inputted by the user are NOT found, suggest the closest alternative from the documents.
+            4. For EACH exercise, include:
+               - Prosthetic limb type(s) that use this exercise
+               - The purpose (choose from {exercise_purpose})
+               - commmon mistakes that individuals make when performing the exercises
+               - Clear step-by-step instructions
+            5. If nothing relevant is found, say 'exercise not found in documentation'.
 
-            f"Please format your response like this:\n\n"
+            Please format your response like this:
+            Exercise: [Name of Exercise]
+            Prosthetic limb type(s): [e.g., transfemoral, transtibial]
+            Purpose: [e.g., Balance, Mobility]
+            Common mistakes: [Common mistakes that individuals make]
+            Steps:
+            1. [Step one]
+            2. [Step two]
+            ...
 
-            f"Exercise: [Name of Exercise]\n"
-            f"Prosthetic limb type(s): [e.g., transfemoral, transtibial]\n"
-            f"Purpose: [e.g., Balance, Mobility]\n"
-            f"Common mistakes: [Common mistakes that people make]\n"
-            f"Steps:\n"
-            f"1. [Step one]\n"
-            f"2. [Step two]\n"
-            f"...\n\n"
-
-            f"IMPORTANT: only provide ONE VERSION of steps for EACH exercise."
+            IMPORTANT: only provide ONE VERSION of steps for EACH exercise.
              
-            )
+            """)
 
         print(user_prosthetic)
         # use no prosthetic prompt if needed
@@ -379,10 +323,6 @@ def ask_llm():
         print("\n LLM Prompt: ", prompt)
         
         # 3. querry LLM chain via qa_chain (run the RAG process)
-        '''
-            RAG process: search the vectorstore + pass results to LLM
-            returns a dictionary with "result" as key based on PDFs
-        '''
         print('global mode: ',global_mode)
         if global_mode == 'uploaded_pdf': # upload pdf mode
             retriever = vectorstore.as_retriever(search_kwargs={
@@ -413,7 +353,7 @@ def ask_llm():
         exercise = re.search(r"Exercise:\s*(.*?)\s*Prosthetic", exercise_recommendation_full_text)
         prosthetic = re.search(r"Prosthetic limb type\(s\):\s*(.*?)\s*Purpose", exercise_recommendation_full_text)
         purpose = re.search(r"Purpose:\s*(.*?)\s*Common mistakes", exercise_recommendation_full_text)
-        mistakes = re.search(r"Common mistakes:\s*(.*?)\s*Steps", exercise_recommendation_full_text, re.DOTALL)
+        mistakes = re.search(r"Common mistakes:\s*(.*?)\s*Steps", exercise_recommendation_full_text)
         print(exercise, prosthetic, purpose, mistakes)
         
         # 4. parse response to get supervision and steps 
@@ -428,7 +368,7 @@ def ask_llm():
         for line in response_lines: # look for key words (supervision, steps, etc.)
             if "steps:" in line.lower():
                 in_steps_section = True
-                #extracted_steps.append(f"Exercise {count}:\n")
+                extracted_steps.append(f"Exercise {count}:\n")
                 count += 1
             elif in_steps_section and line.strip() and (line.strip().startswith(('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.')) or line.strip().startswith(('- ' , '* '))):
                 extracted_steps.append(line.strip())
@@ -611,16 +551,11 @@ def analyze_video():
         base64_data = video_data.get('base64')
         mime_type = video_data.get('mimeType', 'video/mp4')
 
-        '''llm_to_vlm['steps'] = f"""Steps:
-                    1. Lie on your operative side.
-                    2. Lift your non-residual limb straight up, keeping your residual limb straight in line with your hip.
-                    3. Relax.
-                    4. Repeat."""
-                    '''
 
         # prompt - WITH LIMB AMPUTATION   
         prompt = f""" 
-        You are a physiotherapist reviewing a video of a person with this amputation: {llm_to_vlm['user_info']}, performing the exercise: "{llm_to_vlm['exercise']}".
+        You are a physiotherapist reviewing a video of a person with 
+        this amputation: {llm_to_vlm['user_info']}, performing the exercise: "{llm_to_vlm['exercise']}".
         The person may or may not be wearing a prosthetic in this video.
         
         Your tasks are:
@@ -646,7 +581,8 @@ def analyze_video():
         
         # prompt - NO LIMB AMPUTATION
         prompt_no_prosthetic = f""" 
-        You are a physiotherapist reviewing a video of a person performing the exercise: "{llm_to_vlm['exercise']}".
+        You are a physiotherapist reviewing a video of a person performing 
+        the exercise: "{llm_to_vlm['exercise']}".
         
         Your tasks are:
             1. Assess whether the person is correctly following these prescribed steps:
