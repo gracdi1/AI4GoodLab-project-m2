@@ -351,7 +351,7 @@ def ask_llm():
             f"4. For EACH exercise, include:\n"
             f"   - Prosthetic limb type(s) that use this exercise\n"
             f"   - The purpose (choose from {exercise_purpose})\n"
-            f"   - commmon mistakes that individuals make when performing the exercises\n"
+            f"   - commmon mistakes that individuals make when performing the exercises.\n"
             f"   - Clear step-by-step instructions\n"
             f"5. If nothing relevant is found, say 'exercise not found in documentation'.\n"
 
@@ -360,7 +360,7 @@ def ask_llm():
             f"Exercise: [Name of Exercise]\n"
             f"Prosthetic limb type(s): [e.g., transfemoral, transtibial]\n"
             f"Purpose: [e.g., Balance, Mobility]\n"
-            f"Common mistakes: [Common mistakes that individuals make]\n"
+            f"Common mistakes: [Common mistakes that people make]\n"
             f"Steps:\n"
             f"1. [Step one]\n"
             f"2. [Step two]\n"
@@ -413,7 +413,7 @@ def ask_llm():
         exercise = re.search(r"Exercise:\s*(.*?)\s*Prosthetic", exercise_recommendation_full_text)
         prosthetic = re.search(r"Prosthetic limb type\(s\):\s*(.*?)\s*Purpose", exercise_recommendation_full_text)
         purpose = re.search(r"Purpose:\s*(.*?)\s*Common mistakes", exercise_recommendation_full_text)
-        mistakes = re.search(r"Common mistakes:\s*(.*?)\s*Steps", exercise_recommendation_full_text)
+        mistakes = re.search(r"Common mistakes:\s*(.*?)\s*Steps", exercise_recommendation_full_text, re.DOTALL)
         print(exercise, prosthetic, purpose, mistakes)
         
         # 4. parse response to get supervision and steps 
@@ -428,7 +428,7 @@ def ask_llm():
         for line in response_lines: # look for key words (supervision, steps, etc.)
             if "steps:" in line.lower():
                 in_steps_section = True
-                extracted_steps.append(f"Exercise {count}:\n")
+                #extracted_steps.append(f"Exercise {count}:\n")
                 count += 1
             elif in_steps_section and line.strip() and (line.strip().startswith(('1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.', '10.')) or line.strip().startswith(('- ' , '* '))):
                 extracted_steps.append(line.strip())
